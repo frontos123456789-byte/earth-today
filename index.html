@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#070a12">
+<title>Земля сегодня — погода, космос, сейсмика в реальном времени</title>
+<meta name="description" content="Живая сводка по планете: погода для вашего города, геомагнитные бури и вспышки на Солнце, землетрясения на интерактивном глобусе.">
+<meta property="og:title" content="Земля сегодня">
+<meta property="og:description" content="Погода, космическая погода и землетрясения в реальном времени на одном экране.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3CradialGradient id='g' cx='.32' cy='.3'%3E%3Cstop offset='0' stop-color='%239fd8ff'/%3E%3Cstop offset='.5' stop-color='%232f7df0'/%3E%3Cstop offset='1' stop-color='%230a2466'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='32' cy='32' r='28' fill='url(%23g)'/%3E%3Cpath d='M14 30c6-8 14-4 18-10s10-4 14 0-2 10-8 12-6 10-12 8-14-4-12-10z' fill='%2347d18c' opacity='.85'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api.open-meteo.com">
+<link rel="preconnect" href="https://services.swpc.noaa.gov">
+<link rel="preconnect" href="https://earthquake.usgs.gov">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Onest:wght@400;500;600;700&display=swap">
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/d3-array@3.2.4/dist/d3-array.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/d3-geo@3.1.1/dist/d3-geo.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<style>
+/* ================= Токены ================= */
+:root{
+  --font:"Onest",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Consolas,monospace;
+  --bg:#070a12; --bg2:#0b1020; --surface:#0f1524; --surface2:#161d30; --line:#222b42; --line2:#2e3956;
+  --text:#edf1f9; --muted:#8e9ab3; --faint:#5d6880;
+  --accent:#6ea8ff; --wx:#5cc8ff; --sp:#b79bff; --eq:#ff8f66; --ok:#3ecf8e;
+  --lv0:#3ecf8e; --lv0t:#03200f; --lv1:#f0c93c; --lv1t:#2a2100; --lv2:#ff9240; --lv2t:#2b1200;
+  --lv3:#e5454c; --lv3t:#ffffff; --lv4:#a34bff; --lv4t:#ffffff;
+  --g-ocean1:#16305c; --g-ocean2:#0a1630; --g-land:#2b4a52; --g-land2:#3d6a63; --g-border:#0d1b33; --g-grat:#ffffff; --g-glow:#4f8dff; --g-aurora:#54f59a; --g-night:#02040c;
+  --cloud:#dfe6f3; --sun:#ffc53d; --moon:#cdd7ff; --rain:#5cb3ff;
+  --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 12px 40px rgba(0,0,0,.35);
+  --r:20px;
+}
+[data-theme="light"]{
+  --bg:#f3f5fa; --bg2:#e9edf6; --surface:#ffffff; --surface2:#f0f3f9; --line:#dfe4ee; --line2:#cdd4e2;
+  --text:#101624; --muted:#56627a; --faint:#8b95a8;
+  --accent:#1f62d6; --wx:#0b7fc2; --sp:#6b46d9; --eq:#d2501f; --ok:#12925a;
+  --g-ocean1:#bcd9ff; --g-ocean2:#7fb0f0; --g-land:#e9eee2; --g-land2:#cfe0c4; --g-border:#9db4d2; --g-grat:#1b3a6b; --g-glow:#5c9cff; --g-aurora:#0fbf62; --g-night:#0a1430;
+  --cloud:#aab6c9; --sun:#f0a400; --moon:#7f8fc7; --rain:#2b8be0;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 12px 32px rgba(16,24,40,.07);
+}
+/* Режим наблюдения — только красный спектр, чтобы не сбивать ночное зрение */
+[data-theme="night"]{
+  --bg:#000; --bg2:#000; --surface:#080000; --surface2:#140303; --line:#330a06; --line2:#4a100a;
+  --text:#ff5a44; --muted:#b33b2b; --faint:#7a2018;
+  --accent:#ff3d26; --wx:#ff5a44; --sp:#ff5a44; --eq:#ff5a44; --ok:#b33b2b;
+  --lv0:#4a0d08; --lv0t:#ff9a88; --lv1:#7a1a10; --lv1t:#ffb3a5; --lv2:#a82a18; --lv2t:#000; --lv3:#d63a22; --lv3t:#000; --lv4:#ff6a4c; --lv4t:#000;
+  --g-ocean1:#1a0303; --g-ocean2:#080000; --g-land:#3d0c07; --g-land2:#55120a; --g-border:#000; --g-grat:#ff5a44; --g-glow:#a81a0a; --g-aurora:#ff3d26; --g-night:#000;
+  --cloud:#b33b2b; --sun:#ff5a44; --moon:#ff5a44; --rain:#d63a22; --shadow:none;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth;scroll-padding-top:84px;-webkit-text-size-adjust:100%}
+body{margin:0;color:var(--text);font:15px/1.5 var(--font);-webkit-font-smoothing:antialiased;
+  background:radial-gradient(1100px 620px at 85% -8%,color-mix(in srgb,var(--accent) 16%,transparent),transparent 62%),radial-gradient(900px 560px at -8% 28%,color-mix(in srgb,var(--sp) 10%,transparent),transparent 60%),var(--bg);background-attachment:fixed}
+[data-theme="night"] body{background:#000}
+h1,h2,h3,p,dl,dd{margin:0}
+a{color:var(--accent);text-underline-offset:3px}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.muted{color:var(--muted)} .small{font-size:13px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.skip{position:fixed;left:-999px;top:10px;background:var(--accent);color:#fff;padding:8px 14px;border-radius:10px;z-index:99}
+.skip:focus{left:10px}
+svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ================= Шапка ================= */
+.top{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 78%,transparent);backdrop-filter:saturate(1.4) blur(16px);-webkit-backdrop-filter:saturate(1.4) blur(16px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1360px;margin:0 auto;padding:10px 20px;display:flex;gap:12px;align-items:center}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-.02em;color:var(--text);text-decoration:none;white-space:nowrap}
+.brand i{width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 32% 30%,#9fd8ff,#2f7df0 48%,#0a2466 85%);box-shadow:0 0 18px color-mix(in srgb,var(--accent) 55%,transparent)}
+[data-theme="night"] .brand i{background:radial-gradient(circle at 32% 30%,#ff6a4c,#5a0f08)}
+.search{position:relative;flex:1;max-width:440px;margin:0 auto}
+.search input{width:100%;height:40px;padding:0 44px 0 40px;border-radius:12px;border:1px solid var(--line);background:var(--surface);transition:border-color .15s,box-shadow .15s}
+.search input:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 20%,transparent)}
+.search input::placeholder{color:var(--faint)}
+.search>svg{position:absolute;left:12px;top:11px;color:var(--faint);pointer-events:none}
+.search kbd{position:absolute;right:10px;top:9px;font:500 11px var(--mono);color:var(--faint);border:1px solid var(--line2);border-radius:6px;padding:2px 7px;pointer-events:none}
+#q-list{position:absolute;top:46px;left:0;right:0;margin:0;padding:6px;list-style:none;background:var(--surface);border:1px solid var(--line2);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.45);max-height:340px;overflow:auto}
+#q-list li{padding:9px 10px;border-radius:9px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+#q-list li small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#q-list li[aria-selected="true"],#q-list li[role=option]:hover{background:var(--surface2)}
+#q-list li.hint{cursor:default;padding:6px 10px 4px}
+.acts{display:flex;gap:6px;align-items:center}
+.btn{height:40px;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:0 13px;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;font-weight:500;font-size:14px;transition:background .15s,border-color .15s,transform .1s}
+.btn:hover{background:var(--surface2);border-color:var(--line2)}
+.btn:active{transform:scale(.97)}
+.btn.icon{width:40px;padding:0;justify-content:center}
+.btn.sm{height:32px;padding:0 10px;font-size:13px;border-radius:9px}
+.btn.sm.icon{width:32px;padding:0}
+.btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+[data-theme="night"] .btn[aria-pressed="true"]{color:#000}
+.spin svg{animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.seg{display:inline-flex;background:var(--surface2);border-radius:10px;padding:3px;gap:2px}
+.seg button{height:28px;border:0;background:none;border-radius:8px;padding:0 11px;font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap}
+.seg button:hover{color:var(--text)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+[data-theme="light"] .seg button[aria-pressed="true"]{box-shadow:0 1px 3px rgba(16,24,40,.14)}
+.pop{position:absolute;right:20px;top:58px;width:290px;background:var(--surface);border:1px solid var(--line2);border-radius:16px;padding:16px;box-shadow:0 24px 60px rgba(0,0,0,.45);display:grid;gap:14px}
+.pop .row{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px}
+.pop .keys{border-top:1px solid var(--line);padding-top:12px;display:grid;gap:6px;font-size:13px;color:var(--muted)}
+.pop kbd{font:500 11px var(--mono);border:1px solid var(--line2);border-radius:5px;padding:1px 6px;color:var(--text)}
+.progress{position:fixed;top:0;left:0;right:0;height:2px;z-index:60;overflow:hidden}
+.progress::before{content:"";position:absolute;inset:0;width:38%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:slide 1.1s ease-in-out infinite}
+@keyframes slide{from{transform:translateX(-100%)}to{transform:translateX(270%)}}
+.banner{max-width:1360px;margin:12px auto 0;padding:0 20px}
+.banner>div{background:color-mix(in srgb,var(--lv1) 14%,var(--surface));border:1px solid color-mix(in srgb,var(--lv1) 45%,transparent);border-radius:12px;padding:10px 14px;font-size:14px}
+
+/* ================= Каркас ================= */
+main{max-width:1360px;margin:0 auto;padding:20px 20px 56px;display:grid;gap:44px;overflow-x:clip}
+.card{background:linear-gradient(180deg,var(--surface),color-mix(in srgb,var(--surface) 86%,var(--bg)));border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:var(--shadow);min-width:0}
+.card>h3{font:500 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:20px;flex-wrap:wrap}
+.card>h3 .seg{max-width:100%;overflow-x:auto;text-transform:none;letter-spacing:0;font-family:var(--font)}
+.card>h3 em{font-style:normal;color:var(--faint);letter-spacing:.04em;text-transform:none;font-family:var(--font);font-size:12.5px}
+.sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.sec-head .mono{color:var(--c)}
+.sec-head h2{font-size:30px;font-weight:700;letter-spacing:-.035em;line-height:1.1;margin-top:4px}
+.sec-head p{color:var(--muted);font-size:13px}
+.grid{display:grid;gap:16px}
+.g-21{grid-template-columns:minmax(0,1.9fr) minmax(0,1fr)}
+.g-12{grid-template-columns:minmax(0,1fr) minmax(0,1.9fr)}
+.g-11{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.tiles{display:grid;gap:10px;grid-template-columns:repeat(4,minmax(0,1fr))}
+.tile{background:var(--surface2);border-radius:14px;padding:13px 14px;min-width:0;position:relative;overflow:hidden}
+.tile .k{font:500 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.tile .v{font-size:25px;font-weight:650;letter-spacing:-.03em;margin-top:5px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;line-height:1.15}
+.tile .v small{font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0}
+.tile .s{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.4}
+.tile .viz{position:absolute;right:10px;top:10px;opacity:.9}
+.meter{height:5px;border-radius:3px;background:color-mix(in srgb,var(--text) 10%,transparent);margin-top:9px;overflow:hidden}
+.meter i{display:block;height:100%;border-radius:3px;background:var(--c,var(--accent))}
+.badge{display:inline-flex;align-items:center;justify-content:center;padding:2px 9px;border-radius:999px;font-weight:650;font-size:12.5px;font-variant-numeric:tabular-nums;letter-spacing:0;white-space:nowrap;line-height:1.5}
+.lv0{background:var(--lv0);color:var(--lv0t)}.lv1{background:var(--lv1);color:var(--lv1t)}.lv2{background:var(--lv2);color:var(--lv2t)}.lv3{background:var(--lv3);color:var(--lv3t)}.lv4{background:var(--lv4);color:var(--lv4t)}
+.lvn{background:var(--surface2);color:var(--muted);border:1px solid var(--line2)}
+.note{font-size:13px;color:var(--muted);margin-top:12px;line-height:1.5}
+.err{background:color-mix(in srgb,var(--lv3) 12%,transparent);border:1px solid color-mix(in srgb,var(--lv3) 42%,transparent);border-radius:14px;padding:12px 14px;font-size:14px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:16px}
+.card .err{margin:0}
+.skel{border-radius:12px;background:linear-gradient(90deg,var(--surface2) 25%,color-mix(in srgb,var(--surface2) 55%,var(--line2)) 50%,var(--surface2) 75%);background-size:200% 100%;animation:sh 1.4s linear infinite;min-height:18px}
+@keyframes sh{to{background-position:-200% 0}}
+.chart{position:relative;height:250px}
+.chart canvas{position:absolute;inset:0}
+.empty{height:100%;display:grid;place-items:center;color:var(--muted);text-align:center;padding:20px}
+@media (prefers-reduced-motion:reduce){*,*::before{animation-duration:.001s!important;scroll-behavior:auto!important}}
+
+/* ================= Герой ================= */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,560px);gap:36px;align-items:center;padding-top:8px}
+.hero .place{display:flex;gap:8px;align-items:center}
+.hero h1{font-size:clamp(34px,5vw,58px);font-weight:700;letter-spacing:-.045em;line-height:1.02;margin-top:6px;overflow-wrap:anywhere}
+.now{display:flex;align-items:center;gap:18px;margin-top:22px}
+.now .t{font-size:clamp(76px,10vw,120px);font-weight:700;letter-spacing:-.06em;line-height:.9}
+.now .cond{font-size:19px;font-weight:600;letter-spacing:-.01em}
+.status{margin-top:26px;display:grid;gap:10px;justify-items:start}
+.pill{display:inline-flex;align-items:center;gap:10px;padding:8px 16px 8px 13px;border-radius:999px;font-weight:650;font-size:15px}
+.pill::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor;box-shadow:0 0 0 4px color-mix(in srgb,currentColor 25%,transparent)}
+.reasons{list-style:none;margin:0;padding:0;display:grid;gap:5px;font-size:14.5px}
+.reasons li{display:flex;gap:9px;align-items:baseline}
+.reasons li::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--c,var(--faint));transform:translateY(-1px)}
+.vitals{margin-top:26px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.vital{display:block;text-decoration:none;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:13px 14px;transition:border-color .15s,transform .15s}
+.vital:hover{border-color:var(--c);transform:translateY(-2px)}
+.vital .mono{color:var(--c);display:flex;align-items:center;gap:7px}
+.vital .mono::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--c)}
+.vital b{display:block;font-size:17px;font-weight:650;letter-spacing:-.02em;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vital span.s{display:block;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Глобус */
+.globe-wrap{position:relative}
+.globe{position:relative;aspect-ratio:1/1;width:100%;border-radius:50%}
+.globe::before{content:"";position:absolute;inset:-12%;border-radius:50%;pointer-events:none;opacity:.55;
+  background-image:radial-gradient(1px 1px at 12% 22%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 82% 14%,#fff 50%,transparent 51%),radial-gradient(1.5px 1.5px at 92% 62%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 6% 72%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 24% 94%,#fff 50%,transparent 51%),radial-gradient(1.5px 1.5px at 70% 96%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 46% 3%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 97% 36%,#fff 50%,transparent 51%)}
+[data-theme="light"] .globe::before,[data-theme="night"] .globe::before{display:none}
+.globe canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:pan-y;cursor:grab;border-radius:50%}
+.globe canvas:active{cursor:grabbing}
+.globe canvas.hit{cursor:pointer}
+.g-ctrl{position:absolute;display:flex;gap:6px;z-index:2}
+.g-ctrl.tl{left:0;top:0;flex-direction:column;align-items:flex-start}
+.g-ctrl.tr{right:0;top:0;flex-direction:column}
+.chip{height:30px;border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 80%,transparent);backdrop-filter:blur(8px);border-radius:999px;padding:0 12px 0 10px;font-size:12.5px;font-weight:500;display:inline-flex;align-items:center;gap:7px;color:var(--muted)}
+.chip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c);opacity:.3}
+.chip[aria-pressed="true"]{color:var(--text);border-color:var(--line2)}
+.chip[aria-pressed="true"]::before{opacity:1;box-shadow:0 0 8px var(--c)}
+.g-info{position:absolute;left:0;right:0;bottom:54px;margin:0 auto;max-width:400px;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(12px);border:1px solid var(--line2);border-radius:16px;padding:12px 40px 12px 14px;font-size:13.5px;box-shadow:0 20px 50px rgba(0,0,0,.4);z-index:3}
+.g-info b{font-size:15px}
+.g-info .x{position:absolute;right:6px;top:6px;width:30px;height:30px;border:0;background:none;border-radius:8px;color:var(--muted);font-size:18px;line-height:1}
+.g-info .x:hover{background:var(--surface2);color:var(--text)}
+.g-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+/* ================= Погода ================= */
+.hours{display:flex;gap:4px;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:10px;margin:0 -6px 6px;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+.hour{flex:0 0 58px;scroll-snap-align:start;display:grid;justify-items:center;gap:3px;padding:8px 0;border-radius:12px;font-size:13px}
+.hour.now{background:var(--surface2)}
+.hour .h{color:var(--muted);font-size:12px}
+.hour .t{font-weight:650;font-size:15px}
+.hour .p{color:var(--rain);font-size:11.5px;height:15px;font-weight:500}
+.days{list-style:none;margin:0;padding:0;display:grid}
+.days li{display:grid;grid-template-columns:70px 30px 38px 34px 1fr 34px;gap:8px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.days li:first-child{border-top:0;padding-top:0}
+.days .pp{color:var(--rain);font-size:12px;font-weight:500}
+.days .lo{color:var(--muted);text-align:right}
+.days .hi{font-weight:650;text-align:right}
+.range{height:6px;border-radius:3px;background:color-mix(in srgb,var(--text) 9%,transparent);position:relative}
+.range i{position:absolute;top:0;bottom:0;border-radius:3px}
+.sunmoon{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center}
+.sunmoon svg{display:block;max-width:100%}
+.moon{display:grid;justify-items:center;gap:6px;text-align:center;font-size:13px}
+.advice{display:grid;gap:14px}
+.advice .row{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;font-size:14.5px}
+.advice .badge{margin-top:1px;min-width:64px}
+
+/* ================= Космос ================= */
+.bignum{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.bignum .n{font-size:54px;font-weight:700;letter-spacing:-.05em;line-height:.95}
+.gauge{display:grid;grid-template-columns:repeat(10,1fr);gap:4px}
+.gauge span{height:28px;border-radius:7px;display:grid;place-items:center;font:600 12px var(--mono);opacity:.22}
+.gauge span.on{opacity:1;box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--text)}
+.kp-chart{display:flex;gap:10px;margin-top:20px}
+.kp-day{display:flex;flex-direction:column;gap:6px;min-width:0}
+.kp-bars{display:flex;gap:3px;align-items:flex-end;height:92px;border-bottom:1px solid var(--line)}
+.kp-bars i{flex:1;border-radius:4px 4px 0 0;min-height:3px}
+.kp-bars i.pred{opacity:.55;background-image:repeating-linear-gradient(135deg,transparent 0 3px,rgba(0,0,0,.3) 3px 5px)}
+.kp-bars i.now{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--text)}
+.kp-day span{font:500 10.5px var(--mono);color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-transform:uppercase}
+.factors{display:grid;gap:11px;margin-top:16px}
+.factor{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:14px}
+.factor dt{color:var(--muted)} .factor dd{font-weight:600;text-align:right}
+.factor .meter{grid-column:1/-1;margin-top:3px}
+.list{list-style:none;margin:0;padding:0;display:grid;max-height:292px;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+.list li{display:flex;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+.list li:first-child{border-top:0}
+.list .grow{flex:1;min-width:0}
+.list .badge{min-width:54px}
+details{font-size:13.5px;color:var(--muted);margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+details summary{cursor:pointer;color:var(--text);font-weight:500}
+details p{margin-top:8px;line-height:1.55}
+
+/* ================= Сейсмика ================= */
+.filters{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.filters label{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--muted)}
+.filters input[type=range]{width:160px;accent-color:var(--eq)}
+.table-wrap{overflow:auto;max-height:470px;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+td.place{white-space:normal;min-width:190px}
+thead th{position:sticky;top:0;background:var(--surface);z-index:1;font:500 10.5px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+th button{background:none;border:0;padding:0;color:inherit;font:inherit;text-transform:inherit;letter-spacing:inherit}
+th[aria-sort] button{color:var(--text)}
+th[aria-sort] button::after{content:" ↓"} th[aria-sort="ascending"] button::after{content:" ↑"}
+tbody tr{transition:background .12s}
+tbody tr:hover{background:var(--surface2)}
+.linklike{background:none;border:0;padding:0;color:var(--text);text-align:left;font:inherit}
+.linklike:hover{color:var(--accent)}
+td.r,th.r{text-align:right}
+
+footer{max-width:1360px;margin:0 auto;padding:24px 20px 48px;border-top:1px solid var(--line);color:var(--muted);font-size:13px;display:flex;gap:10px 28px;flex-wrap:wrap;justify-content:space-between}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:14px;font-size:14px;font-weight:500;z-index:70;max-width:calc(100vw - 32px);box-shadow:0 16px 40px rgba(0,0,0,.4)}
+
+@media (max-width:1080px){
+  .hero{grid-template-columns:minmax(0,1fr);gap:28px}
+  .globe-wrap{max-width:520px;width:100%;margin:0 auto}
+  .g-21,.g-12,.g-11,.g-3{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:720px){
+  .top-in{flex-wrap:wrap;padding:10px 14px;gap:8px}
+  .brand span{display:none}
+  .search{order:3;flex-basis:100%;max-width:none}
+  .search kbd{display:none}
+  .acts{margin-left:auto}
+  .btn .lbl{display:none}
+  .btn:not(.sm){width:40px;padding:0;justify-content:center}
+  .pop{right:14px;top:56px}
+  main{padding:16px 14px 40px;gap:36px}
+  .card{padding:16px;border-radius:18px}
+  .sec-head h2{font-size:26px}
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .vitals{grid-template-columns:minmax(0,1fr)}
+  .vital{display:grid;grid-template-columns:92px 1fr;gap:2px 10px;align-items:baseline}
+  .vital b{margin:0;font-size:15.5px}
+  .vital span.s{grid-column:2}
+  .now{gap:12px}
+  .days li{grid-template-columns:62px 28px 34px 30px 1fr 30px;gap:6px}
+  .sunmoon{grid-template-columns:minmax(0,1fr)}
+  .moon{grid-template-columns:auto 1fr;justify-items:start;text-align:left;gap:12px;align-items:center}
+  .chart{height:220px}
+  .kp-chart{gap:6px}
+  .chip{font-size:12px;padding:0 10px 0 8px}
+}
+</style>
+</head>
+<body id="top">
+<a class="skip" href="#main">Перейти к содержимому</a>
+<div id="progress" class="progress" hidden></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6.3M20 4v7h-7"/></symbol>
+  <symbol id="i-geo" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.800 12 21 12 21z"/><circle cx="12" cy="9.500" r="2.500"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V3M8 7l4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.600-7 10-7 10 7 10 7-3.600 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.200"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
+</svg>
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#top" aria-label="Земля сегодня — наверх"><i aria-hidden="true"></i><span>Земля сегодня</span></a>
+    <div class="search" role="search">
+      <svg class="i"><use href="#i-search"/></svg>
+      <label class="sr" for="q">Поиск города</label>
+      <input id="q" type="search" role="combobox" aria-expanded="false" aria-controls="q-list" aria-autocomplete="list" placeholder="Город или посёлок" autocomplete="off" spellcheck="false">
+      <kbd aria-hidden="true">/</kbd>
+      <ul id="q-list" role="listbox" aria-label="Найденные города" hidden></ul>
+    </div>
+    <div class="acts">
+      <button class="btn icon" id="btn-geo" type="button" aria-label="Определить моё местоположение" title="Моё местоположение"><svg class="i"><use href="#i-geo"/></svg></button>
+      <button class="btn" id="btn-night" type="button" aria-pressed="false" title="Красный экран для наблюдения за сиянием (N)"><svg class="i"><use href="#i-eye"/></svg><span class="lbl">Наблюдение</span></button>
+      <button class="btn icon" id="btn-share" type="button" aria-label="Поделиться снимком состояния" title="Поделиться"><svg class="i"><use href="#i-share"/></svg></button>
+      <button class="btn icon" id="btn-refresh" type="button" aria-label="Обновить все данные" title="Обновить (R)"><svg class="i"><use href="#i-refresh"/></svg></button>
+      <button class="btn icon" id="btn-set" type="button" aria-label="Настройки: единицы и тема" aria-expanded="false" aria-controls="settings" title="Настройки"><svg class="i"><use href="#i-gear"/></svg></button>
+    </div>
+    <div class="pop" id="settings" hidden>
+      <div class="row"><span>Температура</span><div class="seg" role="group" aria-label="Единицы температуры"><button type="button" data-unit="temp" data-val="c">°C</button><button type="button" data-unit="temp" data-val="f">°F</button></div></div>
+      <div class="row"><span>Ветер</span><div class="seg" role="group" aria-label="Единицы скорости ветра"><button type="button" data-unit="wind" data-val="ms">м/с</button><button type="button" data-unit="wind" data-val="kmh">км/ч</button></div></div>
+      <div class="row"><span>Расстояния</span><div class="seg" role="group" aria-label="Единицы расстояния и глубины"><button type="button" data-unit="dist" data-val="metric">км</button><button type="button" data-unit="dist" data-val="imperial">мили</button></div></div>
+      <div class="row"><span>Тема</span><div class="seg" role="group" aria-label="Тема оформления"><button type="button" data-theme-set="auto">Авто</button><button type="button" data-theme-set="light">Светлая</button><button type="button" data-theme-set="dark">Тёмная</button></div></div>
+      <div class="keys"><span><kbd>/</kbd> поиск города</span><span><kbd>R</kbd> обновить данные</span><span><kbd>N</kbd> режим наблюдения</span><span><kbd>T</kbd> сменить тему</span></div>
+    </div>
+  </div>
+</header>
+<div class="banner" id="stale" role="status" hidden></div>
+
+<main id="main">
+  <!-- ===== Сводка + глобус ===== -->
+  <section class="hero" aria-label="Сводка">
+    <div>
+      <p class="place"><span class="mono" id="hero-country">&nbsp;</span></p>
+      <h1 id="hero-city">Загрузка…</h1>
+      <div class="now">
+        <span id="hero-ico" aria-hidden="true"></span>
+        <span class="t num" id="hero-temp">—</span>
+        <div><div class="cond" id="hero-cond">&nbsp;</div><div class="muted" id="hero-feels">&nbsp;</div></div>
+      </div>
+      <div class="status" aria-live="polite">
+        <span class="pill lv0" id="status-pill">Оцениваем</span>
+        <ul class="reasons" id="status-reasons"><li>Собираем данные с трёх источников</li></ul>
+      </div>
+      <nav class="vitals" aria-label="Разделы">
+        <a class="vital" href="#weather" style="--c:var(--wx)"><span class="mono">Погода</span><b id="v-wx">—</b><span class="s" id="v-wx-s">&nbsp;</span></a>
+        <a class="vital" href="#space" style="--c:var(--sp)"><span class="mono">Космос</span><b id="v-sp">—</b><span class="s" id="v-sp-s">&nbsp;</span></a>
+        <a class="vital" href="#quakes" style="--c:var(--eq)"><span class="mono">Сейсмика</span><b id="v-eq">—</b><span class="s" id="v-eq-s">&nbsp;</span></a>
+      </nav>
+    </div>
+    <div class="globe-wrap">
+      <div class="globe" id="globe">
+        <canvas id="globe-c" tabindex="0" role="application" aria-label="Интерактивный глобус: землетрясения, овал полярного сияния и граница дня и ночи. Стрелки вращают, плюс и минус меняют масштаб. Те же события есть в таблице ниже."></canvas>
+      </div>
+      <div class="g-ctrl tl" role="group" aria-label="Слои глобуса">
+        <button class="chip" type="button" data-layer="quakes" style="--c:var(--eq)">Землетрясения</button>
+        <button class="chip" type="button" data-layer="aurora" style="--c:var(--g-aurora)">Сияние</button>
+        <button class="chip" type="button" data-layer="night" style="--c:var(--accent)">День и ночь</button>
+      </div>
+      <div class="g-ctrl tr">
+        <button class="btn sm icon" type="button" id="g-in" aria-label="Приблизить"><svg class="i"><use href="#i-plus"/></svg></button>
+        <button class="btn sm icon" type="button" id="g-out" aria-label="Отдалить"><svg class="i"><use href="#i-minus"/></svg></button>
+        <button class="btn sm icon" type="button" id="g-me" aria-label="Повернуть к моему местоположению"><svg class="i"><use href="#i-target"/></svg></button>
+      </div>
+      <div class="g-info" id="g-info" hidden></div>
+      <div class="g-foot">
+        <span class="seg" role="group" aria-label="Период землетрясений"><button type="button" data-period="hour">Час</button><button type="button" data-period="day">Сутки</button><button type="button" data-period="week">Неделя</button></span>
+        <span class="muted small num" id="g-cap" aria-live="polite"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Погода ===== -->
+  <section id="weather" aria-labelledby="h-weather">
+    <div class="sec-head" style="--c:var(--wx)"><div><span class="mono">01 · Атмосфера</span><h2 id="h-weather">Погода</h2></div><p>Open-Meteo · время местное для выбранной точки</p></div>
+    <div id="weather-err"></div>
+    <div class="grid">
+      <div class="tiles" id="w-tiles"><div class="skel" style="height:104px"></div><div class="skel" style="height:104px"></div><div class="skel" style="height:104px"></div><div class="skel" style="height:104px"></div></div>
+      <div class="grid g-21">
+        <div class="card">
+          <h3>Ближайшие 24 часа
+            <span class="seg" role="group" aria-label="Показатель на графике"><button type="button" data-htab="temp">Температура</button><button type="button" data-htab="rain">Осадки</button><button type="button" data-htab="wind">Ветер</button><button type="button" data-htab="uv">УФ</button></span>
+          </h3>
+          <div class="hours" id="w-hours" tabindex="0" aria-label="Почасовой прогноз, прокручивается"><div class="skel" style="height:96px;flex:1"></div></div>
+          <div class="chart"><canvas id="c-hourly" role="img" aria-label="Почасовой график на 24 часа"></canvas></div>
+        </div>
+        <div class="card"><h3>7 дней</h3><ul class="days" id="w-days"><li class="skel" style="height:300px;display:block"></li></ul></div>
+      </div>
+      <div class="grid g-3">
+        <div class="card"><h3>Солнце и Луна</h3><div id="w-sun"><div class="skel" style="height:130px"></div></div></div>
+        <div class="card"><h3>Сравнение с нормой <em>те же даты, 10 лет</em></h3><div id="w-norm"><div class="skel" style="height:130px"></div></div></div>
+        <div class="card"><h3>Что это значит для вас</h3><div class="advice" id="w-advice"><div class="skel" style="height:130px"></div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Космос ===== -->
+  <section id="space" aria-labelledby="h-space">
+    <div class="sec-head" style="--c:var(--sp)"><div><span class="mono">02 · Солнце и магнитосфера</span><h2 id="h-space">Космическая погода</h2></div><p>NOAA SWPC · время в вашем часовом поясе</p></div>
+    <div class="grid">
+      <div class="grid g-21">
+        <div class="card"><h3>Геомагнитная активность · индекс Kp</h3><div id="s-kp"><div class="skel" style="height:230px"></div></div></div>
+        <div class="card"><h3>Полярное сияние</h3><div id="s-aurora"><div class="skel" style="height:230px"></div></div></div>
+      </div>
+      <div class="grid g-11">
+        <div class="card"><h3>Рентгеновское излучение Солнца <em>GOES, 6 часов</em></h3><div id="s-xray-head"></div><div class="chart"><canvas id="c-xray" role="img" aria-label="График рентгеновского потока Солнца по классам вспышек"></canvas></div></div>
+        <div class="card"><h3>Солнечный ветер <em>24 часа</em></h3><div class="tiles" id="s-wind-tiles" style="margin-bottom:14px"></div><div class="chart" style="height:176px"><canvas id="c-wind" role="img" aria-label="График скорости и плотности солнечного ветра за сутки"></canvas></div></div>
+      </div>
+      <div class="grid g-12">
+        <div class="card"><h3>Солнце сегодня</h3><div class="tiles" id="s-sun" style="grid-template-columns:minmax(0,1fr)"><div class="skel" style="height:200px"></div></div></div>
+        <div class="card"><h3>Вспышки за 3 дня</h3><ul class="list" id="s-flares"><li class="skel" style="height:200px;display:block"></li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Землетрясения ===== -->
+  <section id="quakes" aria-labelledby="h-quakes">
+    <div class="sec-head" style="--c:var(--eq)"><div><span class="mono">03 · Литосфера</span><h2 id="h-quakes">Землетрясения</h2></div><p>USGS · время в вашем часовом поясе</p></div>
+    <div id="quakes-err"></div>
+    <div class="grid">
+      <div class="tiles" id="q-stats"><div class="skel" style="height:104px"></div><div class="skel" style="height:104px"></div><div class="skel" style="height:104px"></div><div class="skel" style="height:104px"></div></div>
+      <div class="card">
+        <h3>Магнитуда во времени
+          <span class="seg" role="group" aria-label="Период"><button type="button" data-period="hour">Час</button><button type="button" data-period="day">Сутки</button><button type="button" data-period="week">Неделя</button></span>
+        </h3>
+        <div class="filters" style="margin-bottom:14px">
+          <label for="q-mag">Магнитуда от <input id="q-mag" type="range" min="0" max="7" step="0.5" value="2.5"><output id="q-mag-out" class="badge lv1" for="q-mag">M 2.5+</output></label>
+          <span class="muted small" id="q-count" aria-live="polite"></span>
+        </div>
+        <div class="chart"><canvas id="c-quakes" role="img" aria-label="Диаграмма: магнитуда землетрясений по времени"></canvas></div>
+        <p class="note">Нажмите на точку или строку таблицы — глобус наверху повернётся к эпицентру.</p>
+      </div>
+      <div class="grid g-21">
+        <div class="card"><h3>Последние события <em id="q-shown"></em></h3>
+          <div class="table-wrap" tabindex="0" aria-label="Таблица землетрясений, прокручивается">
+            <table>
+              <thead><tr>
+                <th data-sort="time" aria-sort="descending"><button type="button">Время</button></th>
+                <th data-sort="mag"><button type="button">M</button></th>
+                <th>Место</th>
+                <th class="r">Глубина</th>
+                <th class="r" data-sort="dist"><button type="button">От вас</button></th>
+                <th><span class="sr">Ссылка</span></th>
+              </tr></thead>
+              <tbody id="q-rows"><tr><td colspan="6"><div class="skel" style="height:220px"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card"><h3>История региона <em>M6+, 500 км, с 1900 г.</em></h3><ul class="list" id="q-history" style="max-height:470px"><li class="skel" style="height:200px;display:block"></li></ul></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span>Данные: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0), <a href="https://www.swpc.noaa.gov/" target="_blank" rel="noopener">NOAA SWPC</a>, <a href="https://earthquake.usgs.gov/" target="_blank" rel="noopener">USGS</a>, карта — Natural Earth. <span id="updated"></span></span>
+  <span>Информационный сервис. Не заменяет официальные предупреждения служб вашей страны.</span>
+</footer>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   УТИЛИТЫ: DOM, сеть с кешем и офлайн-копией, даты, единицы, шкалы
+   ===================================================================== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => (v == null || v === '' || !Number.isFinite(+v)) ? null : +v;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const alpha = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+const plural = (n, f) => { const a = Math.abs(n) % 100, b = a % 10; return f[a > 10 && a < 20 ? 2 : b === 1 ? 0 : b >= 2 && b <= 4 ? 1 : 2]; };
+const MIN = 60e3, HOUR = 3600e3, DAY = 86400e3, RAD = Math.PI / 180;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const DEFAULT_LOC = { lat: 55.7558, lon: 37.6173, name: 'Москва', country: 'Россия' };
+const state = {
+  loc: null, recent: [],
+  units: { temp: 'c', wind: 'ms', dist: 'metric' },
+  theme: 'auto', night: false, hourTab: 'temp',
+  layers: { quakes: true, aurora: true, night: true },
+  quake: { period: 'day', minMag: 2.5, sort: 'time' },
+  data: {},                 // ответы модулей: перерисовка при смене единиц и темы идёт без сети
+};
+const sysTheme = matchMedia('(prefers-color-scheme: light)');
+const activeTheme = () => state.night ? 'night' : state.theme === 'auto' ? (sysTheme.matches ? 'light' : 'dark') : state.theme;
+
+/* --- Хранилище (может быть недоступно в приватном режиме) --- */
+const ls = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  prune() {                 // чистим офлайн-копии старше двух суток
+    try {
+      for (const k of Object.keys(localStorage)) if (k.startsWith('et:')) { const v = ls.get(k); if (!v || Date.now() - v.t > 2 * DAY) localStorage.removeItem(k); }
+    } catch {}
+  },
+};
+function save() {
+  // Снимок из ссылки одноразовый: после правки убираем его из адреса, чтобы перезагрузка не откатила настройки
+  try { if (location.hash.includes('lat=')) history.replaceState(null, '', location.pathname + location.search); } catch {}
+  ls.set('earth-today', { loc: state.loc, recent: state.recent, units: state.units, theme: state.theme, quake: state.quake, layers: state.layers, hourTab: state.hourTab });
+}
+function restore() {
+  const s = ls.get('earth-today');
+  if (s) {
+    if (s.loc && Number.isFinite(s.loc.lat)) state.loc = s.loc;
+    if (Array.isArray(s.recent)) state.recent = s.recent.slice(0, 5);
+    Object.assign(state.units, s.units); Object.assign(state.quake, s.quake); Object.assign(state.layers, s.layers);
+    if (['auto', 'light', 'dark'].includes(s.theme)) state.theme = s.theme;
+    if (['temp', 'rain', 'wind', 'uv'].includes(s.hourTab)) state.hourTab = s.hourTab;
+  }
+  applyHash();
+}
+/* --- Ссылка-снимок: #lat=..&lon=..&name=..&t=c&w=ms&d=metric&p=day&m=2.5 --- */
+function applyHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  const lat = num(p.get('lat')), lon = num(p.get('lon'));
+  if (lat == null || lon == null || Math.abs(lat) > 90 || Math.abs(lon) > 180) return false;
+  state.loc = { lat, lon, name: (p.get('name') || 'Выбранная точка').slice(0, 80), country: '' };
+  if (['c', 'f'].includes(p.get('t'))) state.units.temp = p.get('t');
+  if (['ms', 'kmh'].includes(p.get('w'))) state.units.wind = p.get('w');
+  if (['metric', 'imperial'].includes(p.get('d'))) state.units.dist = p.get('d');
+  if (['hour', 'day', 'week'].includes(p.get('p'))) state.quake.period = p.get('p');
+  const m = num(p.get('m')); if (m != null) state.quake.minMag = clamp(Math.round(m * 2) / 2, 0, 7);
+  return true;
+}
+
+/* --- Сеть: кеш с TTL, склейка параллельных запросов, таймаут, офлайн-копия при сбое --- */
+const cache = new Map(), staleUrls = new Map();
+let pending = 0;
+function busy(d) {
+  pending += d;
+  $('#progress').hidden = pending <= 0;
+  $('#btn-refresh').classList.toggle('spin', pending > 0);
+}
+function fetchJSON(url, { ttl = 5 * MIN, force = false, timeout = 25000, persist = false } = {}) {
+  const hit = cache.get(url);
+  if (hit?.promise) return hit.promise;
+  if (hit && !force && Date.now() - hit.t < ttl) return Promise.resolve(hit.data);
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), timeout);
+  busy(1);
+  const promise = fetch(url, { signal: ctrl.signal })
+    .then(r => { if (!r.ok) throw new Error(`сервер ответил ${r.status}`); return r.json(); })
+    .then(data => {
+      cache.set(url, { t: Date.now(), data });
+      if (staleUrls.delete(url)) renderStale();
+      if (persist) { const s = JSON.stringify(data); if (s.length < 4e5) ls.set('et:' + url, { t: Date.now(), d: data }); }
+      return data;
+    })
+    .catch(e => {
+      cache.delete(url);
+      const copy = hit?.data ? { t: hit.t, d: hit.data } : persist ? ls.get('et:' + url) : null;
+      if (copy) { staleUrls.set(url, copy.t); renderStale(); return copy.d; }      // лучше вчерашние данные, чем пустой экран
+      throw new Error(e.name === 'AbortError' ? 'превышено время ожидания' : /Failed to fetch|NetworkError|Load failed/.test(e.message) ? 'нет соединения или запрос заблокирован' : e.message);
+    })
+    .finally(() => { clearTimeout(timer); busy(-1); });
+  cache.set(url, { ...(hit || {}), promise });
+  return promise;
+}
+function renderStale() {
+  const box = $('#stale');
+  if (!staleUrls.size) { box.hidden = true; return; }
+  const oldest = Math.min(...staleUrls.values());
+  box.innerHTML = `<div>Часть источников сейчас недоступна — показаны сохранённые данные от ${fDT.format(new Date(oldest))}. Обновим автоматически, как только связь вернётся.</div>`;
+  box.hidden = false;
+}
+
+/* --- Даты --- */
+const parseUTC = s => new Date(/Z$|[+-]\d\d:?\d\d$/.test(s) ? s : s.replace(' ', 'T') + 'Z');      // NOAA часто без «Z»
+const fTime = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
+const fDT = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const fDay = new Intl.DateTimeFormat('ru-RU', { weekday: 'short', day: 'numeric' });
+const fDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+const fDayMon = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
+function ago(t) {
+  const m = Math.round((Date.now() - t) / MIN);
+  if (m < 1) return 'только что';
+  if (m < 60) return `${m} мин назад`;
+  if (m < 48 * 60) return `${Math.round(m / 60)} ч назад`;
+  return `${Math.round(m / 1440)} дн назад`;
+}
+const fmtDur = ms => { const m = Math.max(0, Math.round(ms / MIN)); return m >= 60 ? `${Math.floor(m / 60)} ч ${m % 60} мин` : `${m} мин`; };
+
+/* --- Единицы: данные всегда метрические, пересчёт только при выводе --- */
+const sign = v => (v < 0 ? '−' : '') + Math.abs(v);
+const U = {
+  tempVal: c => state.units.temp === 'f' ? c * 9 / 5 + 32 : c,
+  tempUnit: () => state.units.temp === 'f' ? '°F' : '°C',
+  temp: c => c == null ? '—' : sign(Math.round(U.tempVal(c))) + '°',
+  tempDelta: d => { const v = state.units.temp === 'f' ? d * 9 / 5 : d; return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + '°'; },
+  windVal: ms => state.units.wind === 'kmh' ? ms * 3.6 : ms,
+  windUnit: () => state.units.wind === 'kmh' ? 'км/ч' : 'м/с',
+  windNum: ms => { const v = U.windVal(ms); return v < 10 ? v.toFixed(1) : String(Math.round(v)); },
+  wind: ms => ms == null ? '—' : `${U.windNum(ms)} ${U.windUnit()}`,
+  dist: km => {
+    if (km == null) return '—';
+    const imp = state.units.dist === 'imperial', v = imp ? km * 0.621371 : km;
+    return `${v < 10 ? v.toFixed(1) : Math.round(v).toLocaleString('ru-RU')} ${imp ? 'миль' : 'км'}`;
+  },
+};
+function haversine(lat1, lon1, lat2, lon2) {
+  const dLat = (lat2 - lat1) * RAD, dLon = (lon2 - lon1) * RAD;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * RAD) * Math.cos(lat2 * RAD) * Math.sin(dLon / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(a));
+}
+
+/* --- Шкалы опасности: уровень 0..4 → классы .lv0…lv4 --- */
+const magLevel = m => m >= 7 ? 4 : m >= 6 ? 3 : m >= 4.5 ? 2 : m >= 2.5 ? 1 : 0;
+const kpLevel = k => { k = Math.round(k); return k >= 8 ? 4 : k >= 6 ? 3 : k >= 5 ? 2 : k >= 4 ? 1 : 0; };
+const flareLevel = c => { const L = (c || '')[0], n = parseFloat((c || '').slice(1)) || 1; return L === 'X' ? (n >= 10 ? 4 : 3) : L === 'M' ? (n >= 5 ? 3 : 2) : L === 'C' ? 1 : 0; };
+const uvLevel = u => u >= 11 ? 4 : u >= 8 ? 3 : u >= 6 ? 2 : u >= 3 ? 1 : 0;
+const aqiLevel = a => a > 100 ? 4 : a > 80 ? 3 : a > 60 ? 2 : a > 40 ? 1 : 0;
+const badge = (text, lv, title = '') => `<span class="badge lv${lv}"${title ? ` title="${esc(title)}"` : ''}>${esc(text)}</span>`;
+const meter = (pct, color) => `<div class="meter" aria-hidden="true"><i style="width:${clamp(pct, 2, 100).toFixed(0)}%;--c:${color}"></i></div>`;
+const tile = (k, v, s = '', extra = '') => `<div class="tile"><div class="k">${k}</div><div class="v num">${v}</div>${s ? `<div class="s">${s}</div>` : ''}${extra}</div>`;
+const errBox = (what, e, retry) => `<div class="err" role="alert"><span>Не удалось загрузить ${esc(what)}: ${esc(e.message || e)}.</span><button class="btn sm" type="button" data-retry="${retry}">Повторить</button></div>`;
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 4500);
+}
+
+/* --- Графики Chart.js: без анимации, цвета берутся из текущей темы --- */
+const charts = {};
+function upsertChart(key, canvas, cfg) {
+  if (!window.Chart) { canvas.parentElement.innerHTML = '<div class="empty">График недоступен: библиотека не загрузилась.</div>'; return; }
+  // Тип графика и плагины у Chart.js после создания не меняются, поэтому при обновлении пересоздаём — это дёшево и происходит только при новых данных
+  charts[key]?.destroy();
+  charts[key] = new Chart(canvas, cfg);
+}
+const gradFill = (hex, a = .28) => ctx => {            // вертикальный градиент под линией
+  const { chart } = ctx, area = chart.chartArea; if (!area) return alpha(hex, a);
+  const g = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+  g.addColorStop(0, alpha(hex, a)); g.addColorStop(1, alpha(hex, 0)); return g;
+};
+function chartOptions(scales, extra = {}) {
+  const grid = cssVar('--line'), text = cssVar('--muted');
+  for (const s of Object.values(scales)) {
+    s.ticks = { color: text, maxRotation: 0, autoSkipPadding: 16, font: { size: 11 }, ...(s.ticks || {}) };
+    s.grid = { color: alpha(grid, .7), ...(s.grid || {}) };
+    s.border = { display: false };
+    if (s.title) s.title = { display: true, color: text, font: { size: 11 }, ...s.title };
+  }
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { align: 'end', labels: { color: text, boxWidth: 8, boxHeight: 8, usePointStyle: true, font: { size: 12 } } },
+      tooltip: { backgroundColor: cssVar('--surface2'), titleColor: cssVar('--text'), bodyColor: cssVar('--text'), borderColor: cssVar('--line2'), borderWidth: 1, padding: 10, cornerRadius: 10, boxPadding: 4, usePointStyle: true },
+      ...(extra.plugins || {}),
+    },
+    scales, ...(extra.root || {}),
+  };
+}
+
+/* =====================================================================
+   ИКОНКИ ПОГОДЫ: собственный набор SVG вместо эмодзи
+   ===================================================================== */
+const IC = {
+  sun: (x = 32, y = 32, r = 11) => `<g stroke="var(--sun)" stroke-width="3" stroke-linecap="round"><circle cx="${x}" cy="${y}" r="${r}" fill="var(--sun)" stroke="none"/>${[0, 45, 90, 135, 180, 225, 270, 315].map(a => `<path d="M${x + Math.cos(a * RAD) * (r + 5)} ${y + Math.sin(a * RAD) * (r + 5)}L${x + Math.cos(a * RAD) * (r + 10)} ${y + Math.sin(a * RAD) * (r + 10)}"/>`).join('')}</g>`,
+  moon: (x = 32, y = 32, s = 1) => `<path transform="translate(${x - 32 * s} ${y - 32 * s}) scale(${s})" d="M41 44a17 17 0 0 1-14-27 1.500 1.500 0 0 0-1.800-2.200A20 20 0 1 0 50 40.800a1.500 1.500 0 0 0-2.200-1.800A17 17 0 0 1 41 44z" fill="var(--moon)"/>`,
+  cloud: (dy = 0) => `<path transform="translate(0 ${dy})" d="M19 46h27a10.500 10.500 0 0 0 1.400-20.900A14.500 14.500 0 0 0 19.600 28 9.200 9.200 0 0 0 19 46z" fill="var(--cloud)"/>`,
+  rain: n => `<g stroke="var(--rain)" stroke-width="3" stroke-linecap="round">${[24, 33, 42].slice(0, n).map(x => `<path d="M${x} 49l-3 8"/>`).join('')}</g>`,
+  snow: n => `<g fill="var(--rain)">${[23, 32, 41].slice(0, n).map((x, i) => `<circle cx="${x}" cy="${i % 2 ? 57 : 52}" r="2.600"/>`).join('')}</g>`,
+  bolt: () => `<path d="M34 42l-7 10h6l-3 9 9-12h-6l4-7z" fill="var(--sun)"/>`,
+  fog: () => `<g stroke="var(--cloud)" stroke-width="3" stroke-linecap="round" opacity=".8"><path d="M16 51h32M21 58h22"/></g>`,
+};
+function wxIcon(code, day = 1, size = 28) {
+  const sky = (x, y) => day ? IC.sun(x, y, 8) : IC.moon(x, y, .62);
+  let g;
+  if (code === 0) g = day ? IC.sun() : IC.moon();
+  else if (code === 1 || code === 2) g = sky(44, 21) + IC.cloud(2);
+  else if (code === 3) g = IC.cloud(-2);
+  else if (code === 45 || code === 48) g = IC.cloud(-8) + IC.fog();
+  else if (code >= 51 && code <= 57) g = IC.cloud(-6) + IC.rain(2);
+  else if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) g = (code === 80 ? sky(44, 17) : '') + IC.cloud(-6) + IC.rain(code === 61 || code === 80 ? 2 : 3);
+  else if ((code >= 71 && code <= 77) || code === 85 || code === 86) g = IC.cloud(-6) + IC.snow(code === 71 ? 2 : 3);
+  else if (code >= 95) g = IC.cloud(-8) + IC.bolt();
+  else g = IC.cloud();
+  return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true">${g}</svg>`;
+}
+const WMO = { 0: 'Ясно', 1: 'Преимущественно ясно', 2: 'Переменная облачность', 3: 'Пасмурно', 45: 'Туман', 48: 'Туман с изморозью', 51: 'Слабая морось', 53: 'Морось', 55: 'Сильная морось', 56: 'Ледяная морось', 57: 'Ледяная морось', 61: 'Небольшой дождь', 63: 'Дождь', 65: 'Сильный дождь', 66: 'Ледяной дождь', 67: 'Ледяной дождь', 71: 'Небольшой снег', 73: 'Снег', 75: 'Сильный снег', 77: 'Снежная крупа', 80: 'Кратковременный дождь', 81: 'Ливень', 82: 'Сильный ливень', 85: 'Снегопад', 86: 'Сильный снегопад', 95: 'Гроза', 96: 'Гроза с градом', 99: 'Сильная гроза с градом' };
+const wmoText = c => WMO[c] || 'Нет данных';
+
+/* =====================================================================
+   ПОГОДА (Open-Meteo)
+   ===================================================================== */
+const COMPASS = ['С', 'ССВ', 'СВ', 'ВСВ', 'В', 'ВЮВ', 'ЮВ', 'ЮЮВ', 'Ю', 'ЮЮЗ', 'ЮЗ', 'ЗЮЗ', 'З', 'ЗСЗ', 'СЗ', 'ССЗ'];
+const UV_TEXT = ['Низкий', 'Умеренный', 'Высокий', 'Очень высокий', 'Экстремальный'];
+const UV_ADVICE = ['Защита не нужна.', 'В полдень держитесь тени, пригодятся очки и крем SPF 30.', 'Нужны крем SPF 30+, головной убор и очки.', 'С 11 до 16 часов лучше быть в тени; SPF 50, закрытая одежда.', 'Днём по возможности не выходите на солнце: кожа обгорает за минуты.'];
+const AQI_TEXT = ['Чистый', 'Умеренный', 'Грязный', 'Очень грязный', 'Опасный'];
+const AQI_ADVICE = ['Хорошее время для прогулок и спорта.', 'Чувствительным людям стоит сократить долгие нагрузки на улице.', 'Сократите интенсивные нагрузки на улице, особенно при астме.', 'Лучше оставаться в помещении, окна закрыть.', 'Не выходите на улицу без необходимости.'];
+const locKey = () => state.loc.lat.toFixed(3) + ',' + state.loc.lon.toFixed(3);
+const locMs = (s, w) => Date.parse(s + ':00Z') - w.utc_offset_seconds * 1000;      // местное время точки → UTC-миллисекунды
+
+async function loadWeather(force = false) {
+  const la = state.loc.lat.toFixed(3), lo = state.loc.lon.toFixed(3), key = locKey();
+  $('#weather').setAttribute('aria-busy', 'true');
+  const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${lo}`
+    + '&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index'
+    + '&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,is_day,cloud_cover,wind_speed_10m,wind_gusts_10m,uv_index,pressure_msl,visibility,dew_point_2m'
+    + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,uv_index_max,sunrise,sunset,daylight_duration'
+    + '&forecast_days=7&timezone=auto&wind_speed_unit=ms';
+  const aUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${la}&longitude=${lo}&current=european_aqi,pm10,pm2_5&timezone=auto`;
+  const [w, a] = await Promise.allSettled([fetchJSON(wUrl, { force, persist: true }), fetchJSON(aUrl, { ttl: 15 * MIN, force, persist: true })]);
+  if (key !== locKey()) return;                       // город успели сменить
+  $('#weather').removeAttribute('aria-busy');
+  if (w.status === 'rejected') {
+    state.data.weather = null;
+    $('#weather-err').innerHTML = errBox('погоду', w.reason, 'weather');
+    renderHero(); renderStatus();
+    return;
+  }
+  $('#weather-err').innerHTML = '';
+  state.data.weather = w.value;
+  state.data.air = a.status === 'fulfilled' ? a.value : null;
+  renderWeather(); renderAurora(); renderStatus();
+  loadClimate();
+}
+
+function renderHero() {
+  const loc = state.loc, w = state.data.weather;
+  $('#hero-city').textContent = loc.name;
+  $('#hero-country').textContent = loc.country || `${Math.abs(loc.lat).toFixed(2)}° ${loc.lat >= 0 ? 'с. ш.' : 'ю. ш.'}, ${Math.abs(loc.lon).toFixed(2)}° ${loc.lon >= 0 ? 'в. д.' : 'з. д.'}`;
+  document.title = `${loc.name} — Земля сегодня`;
+  if (!w) { $('#hero-temp').textContent = '—'; $('#hero-cond').textContent = 'Погода недоступна'; $('#hero-feels').textContent = ''; $('#hero-ico').innerHTML = ''; return; }
+  const c = w.current;
+  $('#hero-ico').innerHTML = wxIcon(c.weather_code, c.is_day, 92);
+  $('#hero-temp').textContent = U.temp(c.temperature_2m);
+  $('#hero-cond').textContent = wmoText(c.weather_code);
+  $('#hero-feels').textContent = `Ощущается как ${U.temp(c.apparent_temperature)}, ${U.tempUnit()}`;
+}
+/* Индексы ближайших 24 часов в почасовых массивах */
+function hourIdx(w) {
+  const from = Math.max(0, w.hourly.time.findIndex(t => t >= w.current.time.slice(0, 13) + ':00'));
+  return Array.from({ length: 24 }, (_, i) => from + i).filter(i => i < w.hourly.time.length);
+}
+const tempColor = c => c >= 30 ? '#ff5b4d' : c >= 22 ? '#ff9a3d' : c >= 14 ? '#f0c93c' : c >= 6 ? '#58d39b' : c >= -4 ? '#4fb8ff' : c >= -15 ? '#6f8dff' : '#a58bff';
+
+function renderWeather() {
+  renderHero();
+  const w = state.data.weather; if (!w) return;
+  const c = w.current, d = w.daily, h = w.hourly, air = state.data.air?.current, idx = hourIdx(w), i0 = idx[0];
+  const dir = c.wind_direction_10m, uv = c.uv_index ?? 0, aqi = air?.european_aqi;
+  const dp = i0 >= 3 ? h.pressure_msl[i0] - h.pressure_msl[i0 - 3] : 0;
+  const vis = h.visibility[i0], dew = h.dew_point_2m[i0];
+  const compass = `<svg class="viz" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" fill="none" stroke="var(--line2)" stroke-width="1.500"/><text x="22" y="9.500" text-anchor="middle" font-size="7" fill="var(--muted)" font-family="var(--mono)">С</text><g transform="rotate(${dir + 180} 22 22)"><path d="M22 9l5.500 15H16.500z" fill="var(--wx)"/><path d="M22 35V22" stroke="var(--wx)" stroke-width="2" stroke-linecap="round"/></g></svg>`;
+  $('#w-tiles').innerHTML = [
+    tile('Ветер', `${U.windNum(c.wind_speed_10m)} <small>${U.windUnit()}</small>`, `${COMPASS[Math.round(dir / 22.5) % 16]} · порывы до ${U.wind(c.wind_gusts_10m)}`, compass),
+    tile('Влажность', `${c.relative_humidity_2m}<small>%</small>`, `Точка росы ${U.temp(dew)}`, meter(c.relative_humidity_2m, 'var(--wx)')),
+    tile('Давление', `${Math.round(c.pressure_msl * 0.750062)} <small>мм рт. ст.</small>`, `${Math.round(c.pressure_msl)} гПа · ${dp > 1 ? '↑ растёт' : dp < -1 ? '↓ падает' : 'стабильно'}`),
+    tile('УФ-индекс', `${uv.toFixed(1)} ${badge(UV_TEXT[uvLevel(uv)], uvLevel(uv))}`, `Максимум сегодня ${(d.uv_index_max[0] ?? 0).toFixed(1)}`, meter(uv / 11 * 100, `var(--lv${uvLevel(uv)})`)),
+    tile('Воздух · EAQI', aqi == null ? '—' : `${Math.round(aqi)} ${badge(AQI_TEXT[aqiLevel(aqi)], aqiLevel(aqi))}`, aqi == null ? 'Нет данных для этой точки' : `PM2.5 ${air.pm2_5} · PM10 ${air.pm10} мкг/м³`, aqi == null ? '' : meter(aqi / 120 * 100, `var(--lv${aqiLevel(aqi)})`)),
+    tile('Осадки', `${c.precipitation} <small>мм</small>`, `Вероятность сегодня ${d.precipitation_probability_max[0] ?? 0}% · ${d.precipitation_sum[0] ?? 0} мм за день`),
+    tile('Облачность', `${c.cloud_cover}<small>%</small>`, c.cloud_cover <= 20 ? 'Небо чистое' : c.cloud_cover <= 60 ? 'Есть просветы' : 'Небо закрыто', meter(c.cloud_cover, 'var(--cloud)')),
+    tile('Видимость', vis == null ? '—' : U.dist(vis / 1000).replace(/ (\S+)$/, ' <small>$1</small>'), vis == null ? '' : vis < 1000 ? 'Туман' : vis < 5000 ? 'Дымка' : 'Хорошая'),
+  ].join('');
+
+  // Лента часов
+  $('#w-hours').innerHTML = idx.map((i, n) => {
+    const pp = h.precipitation_probability[i] ?? 0;
+    return `<div class="hour${n === 0 ? ' now' : ''}"><span class="h num">${n === 0 ? 'Сейчас' : h.time[i].slice(11, 16)}</span><span title="${wmoText(h.weather_code[i])}">${wxIcon(h.weather_code[i], h.is_day[i], 30)}</span><span class="t num">${U.temp(h.temperature_2m[i])}</span><span class="p num">${pp >= 20 ? pp + '%' : ''}</span></div>`;
+  }).join('');
+  renderHourChart();
+
+  // 7 дней: полоса — диапазон дня на фоне диапазона недели, цвет — по абсолютной температуре
+  const lo = Math.min(...d.temperature_2m_min), hi = Math.max(...d.temperature_2m_max), span = Math.max(1, hi - lo);
+  $('#w-days').innerHTML = d.time.map((t, i) => {
+    const pp = d.precipitation_probability_max[i] ?? 0, mn = d.temperature_2m_min[i], mx = d.temperature_2m_max[i];
+    const left = (mn - lo) / span * 100, width = Math.max(7, (mx - mn) / span * 100);
+    return `<li><span>${i === 0 ? 'Сегодня' : esc(fDay.format(new Date(t + 'T12:00:00')))}</span>
+      <span role="img" aria-label="${wmoText(d.weather_code[i])}" title="${wmoText(d.weather_code[i])}">${wxIcon(d.weather_code[i], 1, 28)}</span>
+      <span class="pp num">${pp >= 20 ? pp + '%' : ''}</span><span class="lo num">${U.temp(mn)}</span>
+      <span class="range" aria-hidden="true"><i style="left:${left.toFixed(1)}%;width:${Math.min(width, 100 - left).toFixed(1)}%;background:linear-gradient(90deg,${tempColor(mn)},${tempColor(mx)})"></i></span>
+      <span class="hi num">${U.temp(mx)}</span></li>`;
+  }).join('');
+  renderSunMoon(); renderAdvice();
+  $('#v-wx').textContent = `${U.temp(c.temperature_2m)}, ${wmoText(c.weather_code).toLowerCase()}`;
+  $('#v-wx-s').textContent = `ветер ${U.wind(c.wind_speed_10m)} · осадки ${d.precipitation_probability_max[0] ?? 0}%`;
+}
+
+function renderHourChart() {
+  const w = state.data.weather; if (!w) return;
+  const h = w.hourly, idx = hourIdx(w), labels = idx.map(i => h.time[i].slice(11, 16)), tab = state.hourTab;
+  const wx = cssVar('--wx'), acc = cssVar('--accent'), mut = cssVar('--muted');
+  const line = (label, data, color, o = {}) => ({ type: 'line', label, data, borderColor: color, backgroundColor: gradFill(color), fill: true, tension: .38, pointRadius: 0, pointHoverRadius: 4, borderWidth: 2.5, ...o });
+  let cfg;
+  if (tab === 'rain') cfg = { datasets: [
+      { type: 'bar', label: 'Осадки, мм', data: idx.map(i => h.precipitation[i]), backgroundColor: alpha(cssVar('--rain'), .75), borderRadius: 4, yAxisID: 'y' },
+      line('Вероятность, %', idx.map(i => h.precipitation_probability[i]), acc, { fill: false, yAxisID: 'y1', borderWidth: 2 }),
+    ], scales: { x: { grid: { display: false } }, y: { min: 0, suggestedMax: 2, ticks: { callback: v => v + ' мм' } }, y1: { position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%', stepSize: 25 } } } };
+  else if (tab === 'wind') cfg = { datasets: [
+      line(`Ветер, ${U.windUnit()}`, idx.map(i => +U.windVal(h.wind_speed_10m[i]).toFixed(1)), wx),
+      line(`Порывы, ${U.windUnit()}`, idx.map(i => +U.windVal(h.wind_gusts_10m[i]).toFixed(1)), mut, { fill: false, borderDash: [5, 5], borderWidth: 1.8 }),
+    ], scales: { x: { grid: { display: false } }, y: { min: 0 } } };
+  else if (tab === 'uv') cfg = { datasets: [
+      { type: 'bar', label: 'УФ-индекс', data: idx.map(i => h.uv_index[i]), backgroundColor: idx.map(i => cssVar('--lv' + uvLevel(h.uv_index[i]))), borderRadius: 4 },
+    ], scales: { x: { grid: { display: false } }, y: { min: 0, suggestedMax: 6 } } };
+  else cfg = { datasets: [
+      line(`Температура, ${U.tempUnit()}`, idx.map(i => +U.tempVal(h.temperature_2m[i]).toFixed(1)), wx),
+      line('Ощущается', idx.map(i => +U.tempVal(h.apparent_temperature[i]).toFixed(1)), mut, { fill: false, borderDash: [5, 5], borderWidth: 1.8 }),
+    ], scales: { x: { grid: { display: false } }, y: { ticks: { callback: v => sign(v) + '°' } } } };
+  upsertChart('hourly', $('#c-hourly'), { type: 'bar', data: { labels, datasets: cfg.datasets }, options: chartOptions(cfg.scales) });
+  $$('[data-htab]').forEach(b => b.setAttribute('aria-pressed', b.dataset.htab === tab));
+}
+
+/* --- Солнце и Луна: дуга дня, долгота дня, фаза Луны --- */
+function moonInfo(date = Date.now()) {
+  const age = (((date - Date.UTC(2000, 0, 6, 18, 14)) / DAY) % 29.530588853 + 29.530588853) % 29.530588853, p = age / 29.530588853;
+  const names = ['Новолуние', 'Растущий серп', 'Первая четверть', 'Растущая Луна', 'Полнолуние', 'Убывающая Луна', 'Последняя четверть', 'Убывающий серп'];
+  return { p, illum: (1 - Math.cos(2 * Math.PI * p)) / 2, name: names[Math.round(p * 8) % 8] };
+}
+function moonSVG(p, size = 62) {
+  const r = size / 2 - 2, c = size / 2, k = Math.cos(2 * Math.PI * p), waxing = p < .5, rx = Math.abs(k) * r;
+  const lit = `M${c} ${c - r}A${r} ${r} 0 0 ${waxing ? 1 : 0} ${c} ${c + r}A${rx.toFixed(2)} ${r} 0 0 ${(k > 0) === waxing ? 0 : 1} ${c} ${c - r}z`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="Фаза Луны"><circle cx="${c}" cy="${c}" r="${r}" fill="var(--surface2)" stroke="var(--line2)"/><path d="${lit}" fill="var(--moon)"/></svg>`;
+}
+function renderSunMoon() {
+  const w = state.data.weather; if (!w) return;
+  const d = w.daily, now = locMs(w.current.time, w), sr = locMs(d.sunrise[0], w), ss = locMs(d.sunset[0], w);
+  const f = (now - sr) / (ss - sr), up = f > 0 && f < 1, W = 260, H = 96, x0 = 16, x1 = W - 16, base = 78, amp = 60;
+  const pt = t => [x0 + (x1 - x0) * t, base - Math.sin(Math.PI * t) * amp];
+  const arc = Array.from({ length: 41 }, (_, i) => pt(i / 40).map(v => v.toFixed(1)).join(' ')).join('L');
+  const [sx, sy] = pt(clamp(f, 0, 1));
+  const len = d.daylight_duration[0] * 1000, diff = Math.round((d.daylight_duration[1] - d.daylight_duration[0]) / 60);
+  const next = up ? `До заката ${fmtDur(ss - now)}` : now < sr ? `До восхода ${fmtDur(sr - now)}` : `До восхода ${fmtDur(locMs(d.sunrise[1], w) - now)}`;
+  const m = moonInfo();
+  $('#w-sun').innerHTML = `<div class="sunmoon">
+    <div>
+      <svg viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="Положение Солнца: ${next.toLowerCase()}">
+        <path d="M${arc}" fill="none" stroke="var(--line2)" stroke-width="2" stroke-dasharray="3 5"/>
+        ${up ? `<path d="M${Array.from({ length: 41 }, (_, i) => pt(i / 40 * f).map(v => v.toFixed(1)).join(' ')).join('L')}" fill="none" stroke="var(--sun)" stroke-width="2.500" stroke-linecap="round"/><circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="14" fill="var(--sun)" opacity=".18"/><circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="7" fill="var(--sun)"/>` : ''}
+        <path d="M4 ${base}H${W - 4}" stroke="var(--line2)" stroke-width="1.500"/>
+        <text x="${x0}" y="${H - 2}" font-size="12" fill="var(--muted)" font-family="var(--font)">${d.sunrise[0].slice(11, 16)}</text>
+        <text x="${x1}" y="${H - 2}" font-size="12" fill="var(--muted)" text-anchor="end" font-family="var(--font)">${d.sunset[0].slice(11, 16)}</text>
+      </svg>
+      <p style="font-weight:600;margin-top:8px">${next}</p>
+      <p class="muted small">День ${fmtDur(len)} · завтра ${diff === 0 ? 'так же' : (diff > 0 ? 'на ' + diff + ' мин длиннее' : 'на ' + -diff + ' мин короче')}</p>
+    </div>
+    <div class="moon">${moonSVG(m.p)}<div><b>${m.name}</b><br><span class="muted">освещено ${Math.round(m.illum * 100)}%</span></div></div>
+  </div>`;
+}
+
+function renderAdvice() {
+  const w = state.data.weather; if (!w) return;
+  const d = w.daily, h = w.hourly, c = w.current, aqi = state.data.air?.current?.european_aqi, idx = hourIdx(w);
+  const uvMax = d.uv_index_max[0] ?? 0, lv = uvLevel(uvMax), today = d.time[0];
+  const sunH = h.time.map((t, i) => ({ t, u: h.uv_index[i] })).filter(x => x.t.startsWith(today) && x.u >= 3);
+  const win = sunH.length ? ` Защита нужна примерно с ${sunH[0].t.slice(11, 16)} до ${sunH[sunH.length - 1].t.slice(11, 13)}:59.` : '';
+  const rainAt = idx.slice(0, 12).find(i => (h.precipitation_probability[i] ?? 0) >= 60 && h.precipitation[i] > 0);
+  const snow = rainAt != null && h.weather_code[rainAt] >= 71 && h.weather_code[rainAt] <= 86 && h.weather_code[rainAt] !== 80 && h.weather_code[rainAt] !== 81 && h.weather_code[rainAt] !== 82;
+  const feels = c.apparent_temperature;
+  const wear = feels <= -15 ? 'Сильный мороз: пуховик, шапка, перчатки, закройте лицо.' : feels <= -5 ? 'Морозно: зимняя куртка, шапка и перчатки.' : feels <= 5 ? 'Холодно: тёплая куртка и шапка.' : feels <= 13 ? 'Прохладно: куртка или плотная кофта.' : feels <= 21 ? 'Комфортно: достаточно лёгкой кофты.' : feels <= 28 ? 'Тепло: лёгкая одежда.' : 'Жарко: лёгкая одежда, пейте больше воды.';
+  $('#w-advice').innerHTML =
+    `<div class="row">${badge(U.temp(feels), feels <= -15 || feels >= 33 ? 2 : feels <= -5 || feels >= 28 ? 1 : 0)}<div><b>Одежда.</b> ${wear}${rainAt != null ? ` ${snow ? 'Снег' : 'Дождь'} вероятен около ${h.time[rainAt].slice(11, 16)}${snow ? '' : ' — возьмите зонт'}.` : ' В ближайшие 12 часов без существенных осадков.'}</div></div>`
+    + `<div class="row">${badge('УФ ' + uvMax.toFixed(0), lv)}<div><b>Солнце.</b> ${UV_ADVICE[lv]}${win}</div></div>`
+    + (aqi == null ? '' : `<div class="row">${badge('AQI ' + Math.round(aqi), aqiLevel(aqi))}<div><b>Воздух.</b> ${AQI_ADVICE[aqiLevel(aqi)]}</div></div>`);
+}
+
+/* --- Сравнение с нормой: те же даты ±7 дней за 10 прошлых лет (архив ERA5) --- */
+async function loadClimate() {
+  const w = state.data.weather, box = $('#w-norm'); if (!w) return;
+  const today = w.daily.time[0], y = +today.slice(0, 4), loc = state.loc;
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${loc.lat.toFixed(2)}&longitude=${loc.lon.toFixed(2)}&start_date=${y - 10}-01-01&end_date=${y - 1}-12-31&daily=temperature_2m_max,temperature_2m_min&timezone=auto`;
+  try {
+    const a = await fetchJSON(url, { ttl: DAY });
+    if (loc !== state.loc) return;
+    const t0 = Date.parse(a.daily.time[0] + 'T00:00:00Z'), mx = [], mn = [];
+    for (let yr = y - 10; yr < y; yr++) {
+      const center = Math.round((Date.parse(`${yr}${today.slice(4)}T00:00:00Z`) - t0) / DAY);
+      for (let i = center - 7; i <= center + 7; i++) {
+        if (a.daily.temperature_2m_max[i] != null) mx.push(a.daily.temperature_2m_max[i]);
+        if (a.daily.temperature_2m_min[i] != null) mn.push(a.daily.temperature_2m_min[i]);
+      }
+    }
+    if (mx.length < 30) throw new Error('мало данных в архиве');
+    const avg = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
+    state.data.norm = { max: avg(mx), min: avg(mn), lo: Math.min(...mx), hi: Math.max(...mx), years: `${y - 10}–${y - 1}` };
+    renderClimate();
+  } catch (e) {
+    if (loc !== state.loc) return;
+    state.data.norm = null;
+    box.innerHTML = `<p class="muted">Сравнение с нормой сейчас недоступно: ${esc(e.message)}.</p>`;
+  }
+}
+function renderClimate() {
+  const n = state.data.norm, w = state.data.weather; if (!n || !w) return;
+  const tMax = w.daily.temperature_2m_max[0], d = tMax - n.max;
+  const word = Math.abs(d) < 1 ? 'Около нормы' : d > 0 ? 'Теплее нормы' : 'Холоднее нормы';
+  const lv = Math.abs(d) >= 8 ? 3 : Math.abs(d) >= 5 ? 2 : Math.abs(d) >= 2.5 ? 1 : 0;
+  // Шкала: разброс дневных максимумов за 10 лет, отметки нормы и сегодняшнего дня
+  const lo = Math.min(n.lo, tMax) - 1, hi = Math.max(n.hi, tMax) + 1, pos = v => ((v - lo) / (hi - lo) * 100).toFixed(1);
+  $('#w-norm').innerHTML = `<div class="bignum" style="margin-bottom:6px"><span class="n num">${U.tempDelta(d)}</span>${badge(word, lv)}</div>
+    <p class="muted small">Сегодня днём ${U.temp(tMax)}, обычно в эти дни ${U.temp(n.max)}</p>
+    <div style="position:relative;height:34px;margin-top:18px" aria-hidden="true">
+      <div style="position:absolute;left:${pos(n.lo)}%;right:${(100 - pos(n.hi)).toFixed(1)}%;top:12px;height:8px;border-radius:4px;background:linear-gradient(90deg,${tempColor(n.lo)},${tempColor(n.hi)});opacity:.55"></div>
+      <div style="position:absolute;left:${pos(n.max)}%;top:6px;width:2px;height:20px;background:var(--muted)"></div>
+      <div style="position:absolute;left:calc(${pos(tMax)}% - 8px);top:8px;width:16px;height:16px;border-radius:50%;background:var(--text);border:3px solid var(--surface)"></div>
+    </div>
+    <p class="note" style="margin-top:6px">Полоса — разброс дневных максимумов за ±7 дней от этой даты в ${n.years} гг. (${U.temp(n.lo)}…${U.temp(n.hi)}), штрих — среднее, точка — сегодня. Реанализ ERA5, не официальная 30-летняя норма.</p>`;
+}
+
+/* =====================================================================
+   КОСМОС (NOAA SWPC)
+   ===================================================================== */
+const SWPC = 'https://services.swpc.noaa.gov';
+const MAG_POLE = { lat: 80.8, lon: -72.7 };            // геомагнитный полюс, дипольное приближение
+
+async function loadSpace(force = false) {
+  $('#space').setAttribute('aria-busy', 'true');
+  const jobs = {
+    kp: fetchJSON(`${SWPC}/products/noaa-planetary-k-index-forecast.json`, { force, persist: true }),
+    wind: fetchJSON(`${SWPC}/products/geospace/propagated-solar-wind.json`, { force })                    // неделя, ~1 МБ
+      .catch(() => fetchJSON(`${SWPC}/products/geospace/propagated-solar-wind-1-hour.json`, { force })),   // запасной: 1 час
+    xray: fetchJSON(`${SWPC}/json/goes/primary/xrays-6-hour.json`, { force }),
+    flares: fetchJSON(`${SWPC}/json/goes/primary/xray-flares-7-day.json`, { force, persist: true }),
+    f107: fetchJSON(`${SWPC}/json/f107_cm_flux.json`, { ttl: HOUR, force, persist: true }),
+    ssn: fetchJSON(`${SWPC}/json/solar-cycle/swpc_observed_ssn.json`, { ttl: 6 * HOUR }),
+    aurora: fetchJSON(`${SWPC}/json/ovation_aurora_latest.json`, { ttl: 10 * MIN, force }),
+  };
+  const render = { kp: () => { renderKp(); renderAurora(); }, wind: renderWind, xray: renderXray, flares: () => { renderFlares(); renderSun(); }, f107: renderSun, ssn: renderSun, aurora: () => { renderAurora(); globe.setAurora(); } };
+  const boxes = { kp: '#s-kp', wind: '#s-wind-tiles', xray: '#s-xray-head', flares: '#s-flares', aurora: '#s-aurora' };
+  const names = { kp: 'индекс Kp', wind: 'солнечный ветер', xray: 'рентгеновский поток', flares: 'список вспышек', aurora: 'прогноз сияний' };
+  // Каждый блок рисуется сразу, как пришёл его ответ, и падает независимо от остальных
+  await Promise.allSettled(Object.entries(jobs).map(([k, p]) => p.then(
+    v => { state.data[k] = v; render[k](); renderStatus(); },
+    e => { state.data[k] = null; if (boxes[k]) $(boxes[k]).innerHTML = (k === 'flares' ? '<li>' : '') + errBox(names[k], e, 'space'); else renderSun(); },
+  )));
+  $('#space').removeAttribute('aria-busy');
+}
+
+/* Kp: наблюдения и прогноз в одном массиве */
+function kpSeries() {
+  const raw = state.data.kp; if (!Array.isArray(raw)) return null;
+  const rows = raw.map(r => ({ t: parseUTC(r.time_tag).getTime(), kp: num(r.kp ?? r.Kp), pred: r.observed === 'predicted' })).filter(r => r.kp != null);
+  if (!rows.length) return null;
+  const now = Date.now(), past = rows.filter(r => !r.pred && r.t <= now), cur = past[past.length - 1] || rows[0], next = rows.filter(r => r.t > cur.t);
+  return { rows, cur, max24: Math.max(cur.kp, ...next.filter(r => r.t <= now + DAY).map(r => r.kp)), max3d: Math.max(cur.kp, ...next.map(r => r.kp)) };
+}
+const kpText = k => { k = Math.round(k); return k >= 5 ? `Буря G${Math.min(5, k - 4)}` : k === 4 ? 'Возмущённо' : 'Спокойно'; };
+function renderKp() {
+  const s = kpSeries(); if (!s) return;
+  const { cur, rows, max24, max3d } = s, k = Math.round(cur.kp);
+  const gauge = Array.from({ length: 10 }, (_, i) => `<span class="lv${kpLevel(i)}${i === k ? ' on' : ''}">${i}</span>`).join('');
+  const groups = new Map();
+  for (const r of rows.filter(r => r.t >= cur.t - DAY)) {
+    const key = fDay.format(new Date(r.t));
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  const bars = [...groups].map(([day, list]) => `<div class="kp-day" style="flex:${list.length}"><div class="kp-bars">${list.map(r =>
+    `<i class="lv${kpLevel(r.kp)}${r.pred ? ' pred' : ''}${r === cur ? ' now' : ''}" style="height:${Math.max(4, r.kp / 9 * 100)}%" title="${fDT.format(new Date(r.t))} — Kp ${r.kp.toFixed(1)}${r.pred ? ' (прогноз)' : ''}"></i>`).join('')}</div><span>${esc(day)}</span></div>`).join('');
+  $('#s-kp').innerHTML = `
+    <div class="bignum"><span class="n num">${cur.kp.toFixed(1)}</span>${badge(kpText(cur.kp), kpLevel(cur.kp))}
+      <span class="muted small">измерено ${fDT.format(new Date(cur.t))} · в прогнозе до ${max24.toFixed(1)} за сутки, до ${max3d.toFixed(1)} за 3 дня</span></div>
+    <div class="gauge" role="meter" aria-valuemin="0" aria-valuemax="9" aria-valuenow="${cur.kp.toFixed(1)}" aria-label="Шкала Kp: ${cur.kp.toFixed(1)}, ${kpText(cur.kp)}">${gauge}</div>
+    <div class="kp-chart" role="img" aria-label="Kp за последние сутки и прогноз на три дня, максимум ${max3d.toFixed(1)}">${bars}</div>
+    <p class="note">Сплошные столбцы — измерения, штрихованные — прогноз NOAA с шагом 3 часа. От Kp 5 начинается геомагнитная буря.</p>
+    <details><summary>Магнитные бури и самочувствие</summary>
+      <p>Часть людей связывает бури с головной болью и скачками давления, но исследования дают противоречивые результаты, надёжной причинной связи не установлено. Достоверно бури влияют на технику: радиосвязь, спутниковую навигацию и энергосети. Блок справочный, это не медицинская рекомендация.</p></details>`;
+  $('#v-sp').textContent = `Kp ${cur.kp.toFixed(1)} · ${kpText(cur.kp).toLowerCase()}`;
+}
+
+/* Солнечный ветер: таблица «заголовок + строки», усредняем по 10 минут */
+function windSeries() {
+  const raw = state.data.wind; if (!Array.isArray(raw) || raw.length < 2) return null;
+  const ix = Object.fromEntries(raw[0].map((h, i) => [h, i])), since = Date.now() - DAY, buckets = new Map();
+  let last = null;
+  for (let i = 1; i < raw.length; i++) {
+    const r = raw[i], t = parseUTC(r[ix.time_tag]).getTime();
+    if (!(t >= since)) continue;
+    const p = { t, speed: num(r[ix.speed]), density: num(r[ix.density]), bz: num(r[ix.bz]), bt: num(r[ix.bt]) };
+    if (p.speed != null) last = p;
+    const key = Math.floor(t / (10 * MIN));
+    let b = buckets.get(key); if (!b) buckets.set(key, b = { t: key * 10 * MIN, s: 0, sn: 0, d: 0, dn: 0 });
+    if (p.speed != null) { b.s += p.speed; b.sn++; }
+    if (p.density != null) { b.d += p.density; b.dn++; }
+  }
+  const pts = [...buckets.values()].sort((a, b) => a.t - b.t).map(b => ({ t: b.t, speed: b.sn ? b.s / b.sn : null, density: b.dn ? b.d / b.dn : null }));
+  return last ? { pts, last } : null;
+}
+function renderWind() {
+  const s = windSeries(), box = $('#s-wind-tiles');
+  if (!s) { box.innerHTML = '<p class="muted">Свежих измерений солнечного ветра нет.</p>'; return; }
+  const { last, pts } = s;
+  const spLv = last.speed >= 700 ? 3 : last.speed >= 600 ? 2 : last.speed >= 500 ? 1 : 0, bzLv = last.bz <= -10 ? 2 : last.bz <= -5 ? 1 : 0;
+  box.innerHTML = [
+    tile('Скорость', `${Math.round(last.speed)} <small>км/с</small>`, badge(['Обычная', 'Повышенная', 'Высокая', 'Очень высокая'][spLv], spLv)),
+    tile('Плотность', `${last.density?.toFixed(1) ?? '—'} <small>p/см³</small>`, 'протонов'),
+    tile('Bz', `${last.bz == null ? '—' : sign(+last.bz.toFixed(1))} <small>нТл</small>`, badge(last.bz < 0 ? 'Южное' : 'Северное', bzLv, 'Южное (отрицательное) Bz усиливает бури и сияния')),
+    tile('Bt', `${last.bt?.toFixed(1) ?? '—'} <small>нТл</small>`, `на ${fTime.format(new Date(last.t))}`),
+  ].join('');
+  const c1 = cssVar('--sp'), c2 = cssVar('--lv2');
+  upsertChart('wind', $('#c-wind'), {
+    type: 'line',
+    data: { labels: pts.map(p => fTime.format(new Date(p.t))), datasets: [
+      { label: 'Скорость, км/с', data: pts.map(p => p.speed && Math.round(p.speed)), borderColor: c1, backgroundColor: gradFill(c1), fill: true, pointRadius: 0, borderWidth: 2, tension: .3, yAxisID: 'y', spanGaps: true },
+      { label: 'Плотность, p/см³', data: pts.map(p => p.density && +p.density.toFixed(2)), borderColor: c2, pointRadius: 0, borderWidth: 1.5, tension: .3, yAxisID: 'y1', spanGaps: true },
+    ] },
+    options: chartOptions({ x: { grid: { display: false }, ticks: { maxTicksLimit: 7 } }, y: {}, y1: { position: 'right', min: 0, grid: { drawOnChartArea: false } } }),
+  });
+}
+
+/* Рентгеновский поток GOES: логарифмическая шкала классов A–X */
+function xrayClass(f) {
+  if (!(f > 0)) return '—';
+  const e = clamp(Math.floor(Math.log10(f)), -8, -4);
+  return 'ABCMX'[e + 8] + (f / 10 ** e).toFixed(1);
+}
+function renderXray() {
+  const raw = state.data.xray; if (!Array.isArray(raw)) return;
+  const pts = raw.filter(r => r.energy === '0.1-0.8nm' && r.flux > 0).map(r => ({ t: parseUTC(r.time_tag).getTime(), f: r.flux })).sort((a, b) => a.t - b.t);
+  if (!pts.length) { $('#s-xray-head').innerHTML = '<p class="muted">Свежих измерений нет.</p>'; return; }
+  const last = pts[pts.length - 1], peak = pts.reduce((a, b) => b.f > a.f ? b : a), cls = xrayClass(last.f);
+  $('#s-xray-head').innerHTML = `<div class="bignum"><span class="n num">${cls}</span>${badge(flareLevel(cls) >= 2 ? 'Идёт вспышка' : flareLevel(cls) === 1 ? 'Фон умеренный' : 'Фон спокойный', flareLevel(cls))}
+    <span class="muted small">сейчас · пик за 6 часов ${xrayClass(peak.f)} в ${fTime.format(new Date(peak.t))}</span></div>`;
+  const c = cssVar('--sun'), lv2 = cssVar('--lv2'), lv3 = cssVar('--lv3'), grid = cssVar('--line');
+  const bands = { id: 'bands', beforeDatasetsDraw(ch) {            // подсветка зон M и X
+    const { ctx, chartArea: a, scales: { y } } = ch;
+    for (const [lo, hi, col] of [[1e-5, 1e-4, lv2], [1e-4, 1e-3, lv3]]) { ctx.fillStyle = alpha(col, .1); ctx.fillRect(a.left, y.getPixelForValue(hi), a.width, y.getPixelForValue(lo) - y.getPixelForValue(hi)); }
+  } };
+  const pow10 = v => Math.abs(Math.log10(v) - Math.round(Math.log10(v))) < 1e-6;
+  upsertChart('xray', $('#c-xray'), {
+    type: 'line',
+    data: { labels: pts.map(p => fTime.format(new Date(p.t))), datasets: [{ label: 'Поток 0,1–0,8 нм', data: pts.map(p => p.f), borderColor: c, backgroundColor: gradFill(c, .22), fill: 'start', pointRadius: 0, borderWidth: 2, tension: .2 }] },
+    options: chartOptions({
+      x: { grid: { display: false }, ticks: { maxTicksLimit: 7 } },
+      y: { type: 'logarithmic', min: 1e-8, max: 1e-3, ticks: { autoSkip: false, callback: v => pow10(v) ? ({ '-8': 'A', '-7': 'B', '-6': 'C', '-5': 'M', '-4': 'X' }[Math.round(Math.log10(v))] ?? '') : '' }, grid: { color: ctx => pow10(ctx.tick.value) ? alpha(grid, .8) : 'transparent' } },
+    }, { plugins: { legend: { display: false }, tooltip: { backgroundColor: cssVar('--surface2'), titleColor: cssVar('--text'), bodyColor: cssVar('--text'), borderColor: cssVar('--line2'), borderWidth: 1, padding: 10, cornerRadius: 10, callbacks: { label: i => ' Класс ' + xrayClass(i.parsed.y) } } } }),
+    plugins: [bands],
+  });
+}
+
+function recentFlares(ms) {
+  const raw = state.data.flares; if (!Array.isArray(raw)) return null;
+  const since = Date.now() - ms;
+  return raw.map(f => ({ cls: f.max_class || f.begin_class || '?', begin: f.begin_time && parseUTC(f.begin_time), max: parseUTC(f.max_time || f.begin_time || f.time_tag), end: f.end_time && parseUTC(f.end_time) }))
+    .filter(f => f.max.getTime() >= since).sort((a, b) => b.max - a.max);
+}
+const flarePower = c => ({ A: 1e-8, B: 1e-7, C: 1e-6, M: 1e-5, X: 1e-4 }[c[0]] || 0) * (parseFloat(c.slice(1)) || 1);
+const topFlare = list => list?.length ? list.reduce((a, b) => flarePower(b.cls) > flarePower(a.cls) ? b : a) : null;
+function renderFlares() {
+  const list = recentFlares(3 * DAY); if (!list) return;
+  $('#s-flares').innerHTML = list.length ? list.map(f => `<li>${badge(f.cls, flareLevel(f.cls), 'Класс вспышки')}
+      <span class="grow">Пик ${fDT.format(f.max)}<br><span class="muted small">${f.begin ? 'начало ' + fTime.format(f.begin) : ''}${f.end ? ' · конец ' + fTime.format(f.end) : ' · продолжается'}</span></span>
+      <span class="muted small num">${ago(f.max.getTime())}</span></li>`).join('')
+    : '<li class="muted">За трое суток вспышек не зарегистрировано.</li>';
+}
+function renderSun() {
+  const fl = recentFlares(3 * DAY), f107 = state.data.f107, ssn = state.data.ssn, top = topFlare(fl);
+  const flux = Array.isArray(f107) && f107.length ? f107.reduce((a, b) => a.time_tag > b.time_tag ? a : b) : null;
+  const spots = Array.isArray(ssn) && ssn.length ? ssn[ssn.length - 1] : null;
+  $('#s-sun').innerHTML = [
+    tile('Сильнейшая вспышка · 3 дня', top ? `${esc(top.cls)} ${badge(['Слабая', 'Обычная', 'Сильная', 'Мощная', 'Экстремальная'][flareLevel(top.cls)], flareLevel(top.cls))}` : '—', fl ? `Всего вспышек: ${fl.length}, из них класса M и X: ${fl.filter(f => 'MX'.includes(f.cls[0])).length}` : 'Нет данных'),
+    tile('Радиопоток F10.7', flux ? `${Math.round(flux.flux)} <small>sfu</small>` : '—', flux ? (flux.flux >= 150 ? 'Высокая активность Солнца' : flux.flux >= 100 ? 'Умеренная активность Солнца' : 'Низкая активность Солнца') : 'Нет данных', flux ? meter((flux.flux - 60) / 240 * 100, 'var(--sun)') : ''),
+    tile('Число солнечных пятен', spots ? `${spots.swpc_ssn}` : '—', spots ? `Наблюдение за ${fDayMon.format(parseUTC(spots.Obsdate))}` : 'Нет данных', spots ? meter(spots.swpc_ssn / 250 * 100, 'var(--sp)') : ''),
+  ].join('');
+  if (top) $('#v-sp-s').textContent = `вспышки до ${top.cls} за 3 дня`;
+}
+
+/* --- Сияние: модель OVATION (сетка 1°×1°) + прогноз на ближайшую ночь --- */
+const ovationGrid = new WeakMap();
+function auroraGrid(ov) {
+  let g = ovationGrid.get(ov);
+  if (!g) { g = new Uint8Array(360 * 181); for (const [lo, la, v] of ov.coordinates) g[lo * 181 + la + 90] = v; ovationGrid.set(ov, g); }
+  return g;
+}
+function auroraAt(ov, lat, lon) {
+  const g = auroraGrid(ov), L = ((Math.round(lon) % 360) + 360) % 360, la = Math.round(lat), dir = lat >= 0 ? 1 : -1;
+  const at = (dl, dla) => { const y = la + dla; return y < -90 || y > 90 ? 0 : g[((L + dl + 360) % 360) * 181 + y + 90]; };
+  let overhead = 0, horizon = 0;
+  for (let dl = -3; dl <= 3; dl++) overhead = Math.max(overhead, at(dl, 0), at(dl, dir));
+  // Сияние на высоте 100+ км видно низко над горизонтом с расстояния до ~8° широты
+  for (let d = 2; d <= 8; d++) for (let dl = -6; dl <= 6; dl++) horizon = Math.max(horizon, at(dl, d * dir));
+  return { overhead, horizon };
+}
+const magLat = (lat, lon) => Math.asin(Math.sin(lat * RAD) * Math.sin(MAG_POLE.lat * RAD) + Math.cos(lat * RAD) * Math.cos(MAG_POLE.lat * RAD) * Math.cos((lon - MAG_POLE.lon) * RAD)) / RAD;
+/* Ближайшая ночь: окно темноты, средняя облачность и максимум Kp в этом окне */
+function nightOutlook() {
+  const w = state.data.weather, kp = kpSeries(); if (!w) return null;
+  const d = w.daily, h = w.hourly, now = locMs(w.current.time, w), sr0 = locMs(d.sunrise[0], w);
+  const start = now < sr0 ? now : Math.max(now, locMs(d.sunset[0], w)), end = now < sr0 ? sr0 : locMs(d.sunrise[1], w);
+  if (!(end > start)) return null;
+  const cl = h.time.map((t, i) => ({ t: locMs(t, w), c: h.cloud_cover[i] })).filter(x => x.t >= start - HOUR && x.t <= end && x.c != null);
+  const kpMax = kp ? Math.max(0, ...kp.rows.filter(r => r.t >= start - 3 * HOUR && r.t <= end).map(r => r.kp)) : null;
+  const hm = ms => new Date(ms + w.utc_offset_seconds * 1000).toISOString().slice(11, 16);
+  return { label: `${start === now ? 'сейчас' : hm(start)} – ${hm(end)}`, clouds: cl.length ? Math.round(cl.reduce((s, x) => s + x.c, 0) / cl.length) : null, kpMax, dark: !w.current.is_day };
+}
+function renderAurora() {
+  const ov = state.data.aurora, box = $('#s-aurora'), loc = state.loc;
+  if (!ov?.coordinates) return;
+  const { overhead, horizon } = auroraAt(ov, loc.lat, loc.lon), score = Math.round(Math.max(overhead, horizon * .7));
+  const lvl = score >= 50 ? 4 : score >= 25 ? 3 : score >= 10 ? 2 : score >= 3 ? 1 : 0;
+  const ml = Math.abs(magLat(loc.lat, loc.lon)), kpNeed = Math.ceil((66.5 - ml - 3) / 2);      // край овала ≈ 66.5° − 2·Kp, минус ~3° на видимость у горизонта
+  const n = nightOutlook(), moon = moonInfo();
+  let verdict;
+  if (kpNeed > 9) verdict = 'На этой широте сияний практически не бывает.';
+  else if (!n || n.kpMax == null) verdict = 'Прогноз на ночь появится, когда загрузятся погода и Kp.';
+  else if (n.kpMax >= kpNeed && n.clouds < 60) verdict = 'Ночью стоит выйти посмотреть: активности хватает, небо открыто.';
+  else if (n.kpMax >= kpNeed) verdict = 'Активности хватает, но мешают облака.';
+  else if (n.kpMax >= kpNeed - 1) verdict = 'На грани: следите за Kp в течение ночи.';
+  else verdict = `Ночью активности не хватит: нужен Kp ${Math.max(kpNeed, 0)}, ожидается до ${n.kpMax.toFixed(1)}.`;
+  const row = (k, v, pct, col) => `<div class="factor"><dt>${k}</dt><dd class="num">${v}</dd>${pct == null ? '' : meter(pct, col)}</div>`;
+  box.innerHTML = `
+    <div class="bignum" style="margin-bottom:8px"><span class="n num">${score}<small style="font-size:24px;letter-spacing:0">%</small></span>${badge(['Шансов нет', 'Шанс низкий', 'Возможно', 'Хорошие шансы', 'Отличные шансы'][lvl], lvl >= 3 ? 0 : lvl === 2 ? 1 : 'n')}
+      <span class="muted small">сейчас · над головой ${overhead}%, у горизонта ${horizon}%</span></div>
+    <p style="font-weight:550">${verdict}</p>
+    <dl class="factors">
+      ${row('Тёмное время', n ? n.label : '—')}
+      ${n?.clouds != null ? row('Облачность ночью', n.clouds + '%', n.clouds, 'var(--cloud)') : ''}
+      ${n?.kpMax != null && kpNeed <= 9 ? row(`Kp ночью · нужен ${Math.max(kpNeed, 0)}`, 'до ' + n.kpMax.toFixed(1), n.kpMax / 9 * 100, `var(--lv${kpLevel(n.kpMax)})`) : ''}
+      ${row('Засветка от Луны', Math.round(moon.illum * 100) + '% · ' + moon.name.toLowerCase(), moon.illum * 100, 'var(--moon)')}
+    </dl>
+    <p class="note">Геомагнитная широта ≈ ${ml.toFixed(0)}°. Модель OVATION, прогноз на ${fTime.format(parseUTC(ov['Forecast Time']))}; оценка приблизительная.${lvl >= 2 && !state.night ? ' Включите «Наблюдение», чтобы экран не слепил.' : ''}</p>`;
+}
+
+/* =====================================================================
+   СЕЙСМИКА (USGS)
+   ===================================================================== */
+const USGS = 'https://earthquake.usgs.gov';
+const PERIOD_MS = { hour: HOUR, day: DAY, week: 7 * DAY };
+const feedUrl = (period, minMag) => {
+  const size = period === 'hour' ? 'all' : minMag >= 4.5 ? '4.5' : (minMag >= 2.5 && period === 'week') ? '2.5' : 'all';   // самый лёгкий подходящий фид
+  return `${USGS}/earthquakes/feed/v1.0/summary/${size}_${period}.geojson`;
+};
+const normQuake = f => ({
+  id: f.id, mag: f.properties.mag ?? -1, place: f.properties.place || 'Место не указано', time: f.properties.time,
+  url: /^https:\/\/earthquake\.usgs\.gov\//.test(f.properties.url || '') ? f.properties.url : `${USGS}/earthquakes/map/`,
+  tsunami: f.properties.tsunami, lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], depth: f.geometry.coordinates[2],
+});
+const onlyQuakes = fc => fc.features.filter(f => f.geometry && (f.properties.type || 'earthquake') === 'earthquake').map(normQuake);
+let quakeSeq = 0;
+
+async function loadQuakes(force = false) {
+  const my = ++quakeSeq, { period, minMag } = state.quake;
+  $('#quakes').setAttribute('aria-busy', 'true');
+  const [day, sel] = await Promise.allSettled([fetchJSON(feedUrl('day', 0), { force, persist: true }), fetchJSON(feedUrl(period, minMag), { force })]);
+  if (my !== quakeSeq) return;
+  $('#quakes').removeAttribute('aria-busy');
+  state.data.quakesDay = day.status === 'fulfilled' ? onlyQuakes(day.value) : null;
+  state.data.quakes = sel.status === 'fulfilled' ? onlyQuakes(sel.value) : null;
+  const failed = sel.status === 'rejected' ? sel : day.status === 'rejected' ? day : null;
+  $('#quakes-err').innerHTML = failed ? errBox('данные о землетрясениях', failed.reason, 'quakes') : '';
+  renderQuakeStats(); renderQuakes(); renderStatus();
+}
+function withDist(list) {
+  const { lat, lon } = state.loc;
+  for (const q of list) q.dist = haversine(lat, lon, q.lat, q.lon);
+  return list;
+}
+function renderQuakeStats() {
+  const list = state.data.quakesDay, box = $('#q-stats');
+  if (!list) { box.innerHTML = '<p class="muted">Счётчик за сутки недоступен.</p>'; return; }
+  withDist(list);
+  const top = list.reduce((a, b) => (b.mag > (a?.mag ?? -9) ? b : a), null), near = list.reduce((a, b) => (b.dist < (a?.dist ?? Infinity) ? b : a), null);
+  const felt = list.filter(q => q.mag >= 2.5).length, strong = list.filter(q => q.mag >= 4.5).length;
+  const energy = list.reduce((s, q) => s + (q.mag > 0 ? 10 ** (1.5 * q.mag + 4.8) : 0), 0), eqMag = energy > 0 ? (Math.log10(energy) - 4.8) / 1.5 : 0;
+  box.innerHTML = [
+    tile('За сутки в мире', list.length.toLocaleString('ru-RU'), `${felt} ощутимых (M 2.5+) · ${strong} сильных (M 4.5+)`),
+    tile('Сильнейшее', top ? badge('M ' + top.mag.toFixed(1), magLevel(top.mag)) : '—', top ? `<button class="linklike" type="button" data-quake="${esc(top.id)}">${esc(top.place)}</button> · ${ago(top.time)}` : ''),
+    tile('Ближайшее к вам', near ? U.dist(near.dist).replace(/ (\S+)$/, ' <small>$1</small>') : '—', near ? `${badge('M ' + near.mag.toFixed(1), magLevel(near.mag))} <button class="linklike" type="button" data-quake="${esc(near.id)}">${esc(near.place)}</button>` : ''),
+    tile('Суммарная энергия', `M ${eqMag.toFixed(1)}`, 'Как одно землетрясение такой магнитуды'),
+  ].join('');
+  $('#v-eq').textContent = `${list.length} ${plural(list.length, ['событие', 'события', 'событий'])} за сутки`;
+  $('#v-eq-s').textContent = top ? `сильнейшее M ${top.mag.toFixed(1)} · ${ago(top.time)}` : '';
+}
+const quakeById = id => [...(state.data.quakes || []), ...(state.data.quakesDay || []), ...(state.data.history || [])].find(q => q.id === id);
+function focusQuake(id, scroll = true) {
+  const q = quakeById(id); if (!q) return;
+  globe.select(q);
+  if (scroll) $('#globe').scrollIntoView({ block: 'center', behavior: reducedMotion ? 'auto' : 'smooth' });
+}
+
+function renderQuakes() {
+  const all = state.data.quakes, { minMag, sort, period } = state.quake, body = $('#q-rows');
+  if (!all) { body.innerHTML = '<tr><td colspan="6" class="muted">Нет данных.</td></tr>'; $('#q-count').textContent = ''; globe.setQuakes([]); return; }
+  const list = withDist(all.filter(q => q.mag >= minMag));
+  const cap = `${list.length.toLocaleString('ru-RU')} ${plural(list.length, ['событие', 'события', 'событий'])}`;
+  $('#q-count').textContent = cap;
+  $('#g-cap').textContent = `${cap} · M ${minMag.toFixed(1)}+`;
+  globe.setQuakes(list);
+
+  // Диаграмма «время × магнитуда»: не больше 700 самых сильных точек
+  const lv = [0, 1, 2, 3, 4].map(i => cssVar('--lv' + i)), now = Date.now();
+  const pts = [...list].sort((a, b) => b.mag - a.mag).slice(0, 700).reverse();
+  upsertChart('quakes', $('#c-quakes'), {
+    type: 'bubble',
+    data: { datasets: [{ data: pts.map(q => ({ x: q.time, y: q.mag, r: Math.max(2.5, 1.5 + Math.pow(Math.max(q.mag, 0), 1.5) * .55), q })), backgroundColor: pts.map(q => alpha(lv[magLevel(q.mag)], .55)), borderColor: pts.map(q => lv[magLevel(q.mag)]), borderWidth: 1, hoverBorderWidth: 2 }] },
+    options: chartOptions({
+      x: { type: 'linear', min: now - PERIOD_MS[period], max: now, grid: { display: false }, ticks: { maxTicksLimit: 8, callback: v => period === 'week' ? fDay.format(new Date(v)) : fTime.format(new Date(v)) } },
+      y: { min: Math.max(0, Math.floor(minMag) - .5), suggestedMax: 7, ticks: { callback: v => 'M ' + v } },
+    }, {
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: cssVar('--surface2'), titleColor: cssVar('--text'), bodyColor: cssVar('--text'), borderColor: cssVar('--line2'), borderWidth: 1, padding: 10, cornerRadius: 10, displayColors: false, callbacks: { title: i => `M ${i[0].raw.q.mag.toFixed(1)} · ${fDT.format(new Date(i[0].raw.x))}`, label: i => i.raw.q.place } } },
+      root: { interaction: { mode: 'nearest', intersect: true }, onClick: (e, el) => { if (el[0]) focusQuake(el[0].element.$context.raw.q.id); }, onHover: (e, el) => { e.native.target.style.cursor = el[0] ? 'pointer' : ''; } },
+    }),
+  });
+
+  // Таблица: не больше 150 строк, чтобы не раздувать DOM
+  const sorted = [...list].sort(sort === 'mag' ? (a, b) => b.mag - a.mag : sort === 'dist' ? (a, b) => a.dist - b.dist : (a, b) => b.time - a.time), shown = sorted.slice(0, 150);
+  $('#q-shown').textContent = list.length > shown.length ? `показано ${shown.length} из ${list.length}` : '';
+  body.innerHTML = shown.length ? shown.map(q => `<tr>
+      <td class="num" title="${fDT.format(new Date(q.time))}">${ago(q.time)}</td>
+      <td>${badge(q.mag < 0 ? '—' : q.mag.toFixed(1), magLevel(q.mag))}</td>
+      <td class="place"><button class="linklike" type="button" data-quake="${esc(q.id)}" title="Показать на глобусе">${esc(q.place)}</button></td>
+      <td class="r num">${U.dist(q.depth)}</td><td class="r num">${U.dist(q.dist)}</td>
+      <td><a href="${esc(q.url)}" target="_blank" rel="noopener" aria-label="Страница события на сайте USGS: ${esc(q.place)}">USGS ↗</a></td>
+    </tr>`).join('')
+    : `<tr><td colspan="6" class="muted">За выбранный период событий с магнитудой от ${minMag} нет — уменьшите порог или расширьте период.</td></tr>`;
+  $$('#quakes th[data-sort]').forEach(th => th.dataset.sort === sort ? th.setAttribute('aria-sort', sort === 'dist' ? 'ascending' : 'descending') : th.removeAttribute('aria-sort'));
+}
+
+/* --- История региона: крупнейшие землетрясения в радиусе 500 км с 1900 года --- */
+async function loadHistory(force = false) {
+  const loc = state.loc, box = $('#q-history');
+  const url = `${USGS}/fdsnws/event/1/query?format=geojson&latitude=${loc.lat.toFixed(2)}&longitude=${loc.lon.toFixed(2)}&maxradiuskm=500&minmagnitude=6&starttime=1900-01-01&orderby=magnitude&limit=10`;
+  try {
+    const d = await fetchJSON(url, { ttl: DAY, force });
+    if (loc !== state.loc) return;
+    state.data.history = withDist(d.features.filter(f => f.geometry).map(normQuake));
+    renderHistory();
+  } catch (e) {
+    if (loc !== state.loc) return;
+    state.data.history = null;
+    box.innerHTML = `<li>${errBox('историю региона', e, 'history')}</li>`;
+  }
+}
+function renderHistory() {
+  const list = state.data.history; if (!list) return;
+  $('#q-history').innerHTML = list.length ? withDist(list).map(q => `<li>${badge('M ' + q.mag.toFixed(1), magLevel(q.mag))}
+      <span class="grow"><button class="linklike" type="button" data-quake="${esc(q.id)}" title="Показать на глобусе">${esc(q.place)}</button><br>
+      <span class="muted small">${fDate.format(new Date(q.time))} · ${U.dist(q.dist)} от вас · <a href="${esc(q.url)}" target="_blank" rel="noopener">USGS ↗</a></span></span></li>`).join('')
+    : `<li class="muted">В радиусе 500 км от точки «${esc(state.loc.name)}» с 1900 года землетрясений M6+ в каталоге USGS нет — регион сейсмически спокойный.</li>`;
+}
+
+/* =====================================================================
+   ГЛОБУС: ортографическая проекция на canvas (d3-geo), три слоя данных
+   ===================================================================== */
+/* Подсолнечная точка — нужна для границы дня и ночи */
+function subsolar(date = Date.now()) {
+  const d = (date - Date.UTC(2000, 0, 1, 12)) / DAY, g = (357.529 + 0.98560028 * d) * RAD, q = 280.459 + 0.98564736 * d;
+  const L = (q + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * RAD, e = (23.439 - 0.00000036 * d) * RAD;
+  const dec = Math.asin(Math.sin(e) * Math.sin(L)), ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L));
+  const gmst = (18.697374558 + 24.06570982441908 * d) % 24;
+  return [((ra / RAD - gmst * 15) % 360 + 540) % 360 - 180, dec / RAD];
+}
+const globe = {
+  ok: false, k: 1, rot: [0, 0], quakes: [], aurora: [], hits: [], sel: null, land: null, borders: null, hi: false, raf: 0, visible: true, anim: null,
+  init() {
+    const cv = this.cv = $('#globe-c');
+    if (!window.d3 || !window.topojson || !d3.geoOrthographic) { $('#globe').innerHTML = '<div class="empty" style="border:1px dashed var(--line2);border-radius:50%">Глобус недоступен: библиотека карт не загрузилась. Все события есть в таблице ниже.</div>'; return; }
+    this.ok = true; this.ctx = cv.getContext('2d');
+    this.proj = d3.geoOrthographic().clipAngle(90).precision(.4);
+    this.path = d3.geoPath(this.proj, this.ctx);
+    this.grat = d3.geoGraticule10();
+    this.centerOn(state.loc, false); this.readColors();
+    new ResizeObserver(() => this.resize()).observe(cv);
+    new IntersectionObserver(e => { this.visible = e[0].isIntersecting; if (this.visible) this.draw(); }).observe(cv);
+    this.loadMap('110m'); this.bind();
+    setInterval(() => this.draw(), MIN);          // терминатор и «свежесть» событий меняются со временем
+  },
+  async loadMap(res) {
+    try {
+      const t = await fetchJSON(`https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-${res}.json`, { ttl: Infinity, timeout: 40000 });
+      this.land = topojson.feature(t, t.objects.land); this.borders = topojson.mesh(t, t.objects.countries, (a, b) => a !== b);
+      this.draw();
+    } catch { if (res === '110m') toast('Контуры материков не загрузились — глобус показан без суши.'); }
+  },
+  readColors() { this.c = Object.fromEntries(['ocean1', 'ocean2', 'land', 'land2', 'border', 'grat', 'glow', 'aurora', 'night'].map(k => [k, cssVar('--g-' + k)])); this.c.lv = [0, 1, 2, 3, 4].map(i => cssVar('--lv' + i)); this.c.accent = cssVar('--accent'); this.c.text = cssVar('--text'); },
+  resize() {
+    const r = this.cv.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
+    if (!r.width) return;
+    this.size = r.width; this.cv.width = this.cv.height = Math.round(r.width * dpr); this.dpr = dpr; this.draw();
+  },
+  centerOn(p, animate = true) {
+    const to = [-p.lon, clamp(-p.lat, -80, 80)];
+    if (!animate || reducedMotion || !this.ok) { this.rot = to; this.draw(); return; }
+    const from = [...this.rot], dl = ((to[0] - from[0]) % 360 + 540) % 360 - 180, t0 = performance.now();
+    this.anim = () => {                              // плавный поворот по кратчайшей дуге
+      const t = clamp((performance.now() - t0) / 700, 0, 1), e = 1 - Math.pow(1 - t, 3);
+      this.rot = [from[0] + dl * e, from[1] + (to[1] - from[1]) * e];
+      if (t >= 1) this.anim = null;
+    };
+    this.draw();
+  },
+  zoom(f) { this.k = clamp(this.k * f, 1, 9); if (this.k > 2.6 && !this.hi) { this.hi = true; this.loadMap('50m'); } this.draw(); },
+  setQuakes(list) {
+    this.quakes = [...list].sort((a, b) => b.mag - a.mag).slice(0, 3000).reverse();          // крупные рисуются поверх мелких
+    if (this.sel && !quakeById(this.sel.id)) this.select(null);
+    this.draw();
+  },
+  setAurora() {
+    const ov = state.data.aurora; this.aurora = [];
+    if (ov?.coordinates) for (const [lo, la, v] of ov.coordinates) if (v >= 4) this.aurora.push([lo > 180 ? lo - 360 : lo, la, v]);
+    this.draw();
+  },
+  select(q) {
+    this.sel = q; const box = $('#g-info');
+    if (!q) { box.hidden = true; this.draw(); return; }
+    if (q.dist == null) withDist([q]);
+    box.innerHTML = `<button class="x" type="button" id="g-close" aria-label="Закрыть карточку события">×</button>
+      ${badge('M ' + q.mag.toFixed(1), magLevel(q.mag))} <b>${esc(q.place)}</b><br>
+      <span class="muted">${fDT.format(new Date(q.time))} (${ago(q.time)}) · глубина ${U.dist(q.depth)} · ${U.dist(q.dist)} от вас${q.tsunami ? ' · <b>возможна угроза цунами</b>' : ''}</span><br>
+      <a href="${esc(q.url)}" target="_blank" rel="noopener">Страница события USGS ↗</a>`;
+    box.hidden = false;
+    this.centerOn(q);
+  },
+  draw() { if (!this.ok || this.raf) return; this.raf = requestAnimationFrame(() => { this.raf = 0; this.render(); }); },
+  /* Видима ли точка на обращённой к нам полусфере */
+  front(lon, lat) { const l0 = -this.rot[0] * RAD, p0 = -this.rot[1] * RAD, p = lat * RAD; return Math.sin(p0) * Math.sin(p) + Math.cos(p0) * Math.cos(p) * Math.cos(lon * RAD - l0) > .03; },
+  render() {
+    if (!this.size || !this.visible) return;
+    if (this.anim) this.anim();
+    const { ctx, proj, path, c, size } = this, R = size * .46 * this.k, cx = size / 2, cy = size / 2, now = Date.now(), L = state.layers;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); ctx.clearRect(0, 0, size, size);
+    proj.translate([cx, cy]).scale(R).rotate(this.rot);
+    // Свечение атмосферы
+    if (this.k < 1.15) { const g = ctx.createRadialGradient(cx, cy, R * .96, cx, cy, R * 1.085); g.addColorStop(0, alpha(c.glow, .5)); g.addColorStop(1, alpha(c.glow, 0)); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.085, 0, 7); ctx.fill(); }
+    // Океан
+    const og = ctx.createRadialGradient(cx - R * .35, cy - R * .4, R * .1, cx, cy, R); og.addColorStop(0, c.ocean1); og.addColorStop(1, c.ocean2);
+    ctx.beginPath(); path({ type: 'Sphere' }); ctx.fillStyle = og; ctx.fill();
+    ctx.save(); ctx.beginPath(); path({ type: 'Sphere' }); ctx.clip();
+    ctx.beginPath(); path(this.grat); ctx.strokeStyle = alpha(c.grat, .07); ctx.lineWidth = .6; ctx.stroke();
+    if (this.land) {
+      const lg = ctx.createLinearGradient(0, cy - R, 0, cy + R); lg.addColorStop(0, c.land2); lg.addColorStop(1, c.land);
+      ctx.beginPath(); path(this.land); ctx.fillStyle = lg; ctx.fill();
+      ctx.beginPath(); path(this.borders); ctx.strokeStyle = alpha(c.border, .55); ctx.lineWidth = this.k > 2 ? .8 : .5; ctx.stroke();
+    }
+    // Ночная сторона: три вложенных круга дают мягкий терминатор
+    if (L.night) { const [sl, sp] = subsolar(now), anti = [sl + 180, -sp]; for (const [rad, a] of [[90, .22], [84, .2], [78, .2]]) { ctx.beginPath(); path(d3.geoCircle().center(anti).radius(rad)()); ctx.fillStyle = alpha(c.night, a); ctx.fill(); } }
+    // Овал сияния: ячейки 1°×1° модели OVATION
+    if (L.aurora && this.aurora.length) {
+      const cell = Math.max(1.4, R * RAD * 1.15);            // мягкие перекрывающиеся пятна вместо квадратов — без муара
+      for (const [lo, la, v] of this.aurora) { if (!this.front(lo, la)) continue; const p = proj([lo, la]); ctx.fillStyle = alpha(c.aurora, clamp(v / 110, .05, .45)); ctx.beginPath(); ctx.arc(p[0], p[1], cell, 0, 7); ctx.fill(); }
+    }
+    // Землетрясения
+    this.hits = [];
+    if (L.quakes) {
+      const pulse = reducedMotion ? 0 : (now % 2000) / 2000;
+      for (const q of this.quakes) {
+        if (!this.front(q.lon, q.lat)) continue;
+        const p = proj([q.lon, q.lat]), col = c.lv[magLevel(q.mag)], r = Math.max(2.2, (1.4 + Math.pow(Math.max(q.mag, 0), 1.6) * .62) * Math.sqrt(this.k) * size / 560);
+        ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 7); ctx.fillStyle = alpha(col, .5); ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.stroke();
+        if (now - q.time < HOUR && !reducedMotion) { ctx.beginPath(); ctx.arc(p[0], p[1], r + pulse * 14, 0, 7); ctx.strokeStyle = alpha(col, 1 - pulse); ctx.lineWidth = 1.5; ctx.stroke(); }
+        this.hits.push([p[0], p[1], r, q]);
+      }
+    }
+    // Выбранное событие
+    if (this.sel && this.front(this.sel.lon, this.sel.lat)) { const p = proj([this.sel.lon, this.sel.lat]); ctx.beginPath(); ctx.arc(p[0], p[1], 16, 0, 7); ctx.strokeStyle = c.text; ctx.lineWidth = 2; ctx.stroke(); ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, 7); ctx.fillStyle = c.text; ctx.fill(); }
+    // Ваше местоположение
+    if (this.front(state.loc.lon, state.loc.lat)) { const p = proj([state.loc.lon, state.loc.lat]); ctx.beginPath(); ctx.arc(p[0], p[1], 9, 0, 7); ctx.fillStyle = alpha(c.accent, .28); ctx.fill(); ctx.beginPath(); ctx.arc(p[0], p[1], 4.5, 0, 7); ctx.fillStyle = c.accent; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke(); }
+    ctx.restore();
+    // Блик и кромка
+    const sh = ctx.createRadialGradient(cx - R * .4, cy - R * .45, R * .05, cx, cy, R); sh.addColorStop(0, 'rgba(255,255,255,.10)'); sh.addColorStop(.5, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(0,0,0,.28)');
+    ctx.beginPath(); path({ type: 'Sphere' }); ctx.fillStyle = sh; ctx.fill();
+    // Анимация идёт только пока есть что анимировать
+    if (this.anim || (L.quakes && !reducedMotion && this.quakes.some(q => now - q.time < HOUR))) this.draw();
+  },
+  hitTest(x, y) {
+    for (let i = this.hits.length - 1; i >= 0; i--) { const h = this.hits[i]; if (Math.hypot(h[0] - x, h[1] - y) <= Math.max(h[2], 9) + 3) return h[3]; }
+    return null;
+  },
+  bind() {
+    const cv = this.cv, ptrs = new Map(); let moved = 0, pinch = 0;
+    const xy = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    cv.addEventListener('pointerdown', e => { ptrs.set(e.pointerId, [e.clientX, e.clientY]); moved = 0; pinch = 0; try { cv.setPointerCapture(e.pointerId); } catch {} });
+    cv.addEventListener('pointermove', e => {
+      const prev = ptrs.get(e.pointerId);
+      if (!prev) { cv.classList.toggle('hit', !!this.hitTest(...xy(e))); return; }
+      ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+      if (ptrs.size === 2) {                         // щипок двумя пальцами — масштаб
+        const [a, b] = [...ptrs.values()], dist = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        if (pinch) this.zoom(dist / pinch); pinch = dist; moved = 99; return;
+      }
+      const dx = e.clientX - prev[0], dy = e.clientY - prev[1], dpp = 57.3 / (this.size * .46 * this.k);
+      moved += Math.abs(dx) + Math.abs(dy); this.anim = null;
+      this.rot = [this.rot[0] + dx * dpp, clamp(this.rot[1] - (e.pointerType === 'touch' ? 0 : dy * dpp), -85, 85)];      // на тач-экране вертикаль отдана прокрутке страницы
+      this.draw();
+    });
+    const up = e => { if (ptrs.delete(e.pointerId) && moved < 6 && e.type === 'pointerup') { const q = this.hitTest(...xy(e)); this.select(q); } pinch = 0; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    cv.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); this.zoom(Math.exp(-e.deltaY * .01)); }, { passive: false });      // Ctrl+колесо или щипок на тачпаде; обычная прокрутка остаётся странице
+    cv.addEventListener('keydown', e => {
+      const step = 12 / this.k, m = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+      if (m) { e.preventDefault(); this.rot = [this.rot[0] + m[0], clamp(this.rot[1] + m[1], -85, 85)]; this.draw(); }
+      else if (e.key === '+' || e.key === '=') this.zoom(1.3); else if (e.key === '-') this.zoom(1 / 1.3); else if (e.key === 'Escape') this.select(null);
+    });
+    $('#g-in').addEventListener('click', () => this.zoom(1.5));
+    $('#g-out').addEventListener('click', () => this.zoom(1 / 1.5));
+    $('#g-me').addEventListener('click', () => { this.k = 1; this.centerOn(state.loc); });
+  },
+};
+
+/* =====================================================================
+   ОБЩИЙ СТАТУС: поводы для внимания из всех трёх модулей
+   ===================================================================== */
+function renderStatus() {
+  const r = [], d = state.data, add = (lv, text) => r.push({ lv, text }), w = d.weather?.current;
+  if (w) {
+    if (w.weather_code >= 95) add(2, 'Гроза в вашем районе');
+    if (w.wind_gusts_10m >= 28) add(3, `Штормовые порывы ветра до ${U.wind(w.wind_gusts_10m)}`);
+    else if (w.wind_gusts_10m >= 17) add(2, `Сильные порывы ветра до ${U.wind(w.wind_gusts_10m)}`);
+    if (w.temperature_2m >= 35) add(2, `Сильная жара: ${U.temp(w.temperature_2m)}`);
+    if (w.temperature_2m <= -25) add(2, `Сильный мороз: ${U.temp(w.temperature_2m)}`);
+    const uv = d.weather.daily.uv_index_max[0];
+    if (uv >= 8) add(2, `Очень высокий УФ-индекс: ${uv.toFixed(0)}`);
+  }
+  const aqi = d.air?.current?.european_aqi;
+  if (aqi > 80) add(aqi > 100 ? 3 : 2, `Грязный воздух: индекс ${Math.round(aqi)}`);
+  const kp = kpSeries();
+  if (kp) {
+    const k = Math.round(kp.cur.kp), kf = Math.round(kp.max24);
+    if (k >= 5) add(k >= 7 ? 3 : 2, `Идёт магнитная буря G${Math.min(5, k - 4)} (Kp ${kp.cur.kp.toFixed(1)})`);
+    else if (kf >= 5) add(kf >= 7 ? 3 : 2, `Ожидается магнитная буря G${Math.min(5, kf - 4)} в ближайшие сутки`);
+  }
+  const top = topFlare(recentFlares(DAY)?.filter(f => flareLevel(f.cls) >= 3));
+  if (top) add(top.cls[0] === 'X' ? 3 : 2, `Мощная солнечная вспышка ${top.cls} (${ago(top.max.getTime())})`);
+  if (d.quakesDay) {
+    const big = d.quakesDay.filter(q => q.mag >= 6).sort((a, b) => b.mag - a.mag)[0];
+    if (big) add(big.mag >= 7 ? 3 : 2, `Землетрясение M ${big.mag.toFixed(1)}: ${big.place}`);
+    const near = withDist(d.quakesDay).filter(q => q.dist <= 300 && q.mag >= 4.5).sort((a, b) => b.mag - a.mag)[0];
+    if (near && near !== big) add(near.mag >= 6 ? 3 : 2, `Землетрясение M ${near.mag.toFixed(1)} в ${U.dist(near.dist)} от вас`);
+  }
+  const missing = [!d.weather && 'погода', !kp && 'космос', !d.quakesDay && 'сейсмика'].filter(Boolean), level = r.reduce((m, x) => Math.max(m, x.lv), 0), pill = $('#status-pill');
+  pill.className = `pill lv${level}`;
+  pill.textContent = level >= 3 ? 'Опасно' : level >= 2 ? 'Внимание' : missing.length === 3 ? 'Нет данных' : 'Спокойно';
+  const items = r.sort((a, b) => b.lv - a.lv).slice(0, 4).map(x => `<li style="--c:var(--lv${x.lv})">${esc(x.text)}</li>`);
+  if (!items.length && missing.length < 3) items.push('<li style="--c:var(--lv0)">Значимых погодных, космических и сейсмических событий нет</li>');
+  if (missing.length && !pending) items.push(`<li>Не загружено: ${missing.join(', ')}</li>`);
+  $('#status-reasons').innerHTML = items.join('');
+}
+
+/* =====================================================================
+   ПРИЛОЖЕНИЕ: местоположение, поиск, темы, единицы, шаринг, запуск
+   ===================================================================== */
+function setLocation(loc, remember = true) {
+  state.loc = loc; state.data.norm = null;
+  if (remember) state.recent = [loc, ...state.recent.filter(r => r.name !== loc.name)].slice(0, 5);
+  save();
+  $('#w-norm').innerHTML = '<div class="skel" style="height:130px"></div>';
+  renderHero(); globe.k = 1; globe.centerOn(loc);
+  loadWeather(); loadHistory();
+  renderAurora(); renderQuakeStats(); renderQuakes(); renderStatus();
+}
+function geolocate(manual) {
+  if (!navigator.geolocation) { if (manual) toast('Браузер не поддерживает геолокацию — введите город в поиске.'); return; }
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const lat = +pos.coords.latitude.toFixed(3), lon = +pos.coords.longitude.toFixed(3);
+    let name = 'Моё местоположение', country = '';
+    try {         // обратное геокодирование — только чтобы показать название места
+      const r = await fetchJSON(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&localityLanguage=ru`, { ttl: DAY });
+      name = r.city || r.locality || r.principalSubdivision || name; country = [r.principalSubdivision, r.countryName].filter(x => x && x !== name).join(', ');
+    } catch {}
+    setLocation({ lat, lon, name, country });
+  }, () => {
+    toast(manual ? 'Не удалось определить местоположение — введите город в поиске.' : `Геолокация недоступна, показана ${DEFAULT_LOC.name}. Найдите свой город в поиске.`);
+    if (manual) $('#q').focus();
+  }, { timeout: 10000, maximumAge: 10 * MIN });
+}
+
+/* --- Поиск города: debounce 300 мс, отбрасывание устаревших ответов, недавние места, клавиатура --- */
+function initSearch() {
+  const input = $('#q'), list = $('#q-list');
+  let items = [], active = -1, seq = 0;
+  const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); active = -1; };
+  const open = html => { list.innerHTML = html; list.hidden = false; input.setAttribute('aria-expanded', 'true'); };
+  const draw = (hint = '') => {
+    open((hint ? `<li class="hint mono" role="presentation">${hint}</li>` : '') + (items.length ? items.map((r, i) => `<li role="option" id="q-opt-${i}" data-i="${i}" aria-selected="${i === active}"><span>${esc(r.name)}</span><small>${esc(r.sub)}</small></li>`).join('')
+      : '<li class="hint muted" role="presentation">Ничего не найдено. Попробуйте другое написание.</li>'));
+    if (active >= 0) { input.setAttribute('aria-activedescendant', 'q-opt-' + active); $('#q-opt-' + active)?.scrollIntoView({ block: 'nearest' }); }
+  };
+  let hint = '';
+  const showRecent = () => { if (input.value.trim() || !state.recent.length) return; items = state.recent.map(r => ({ name: r.name, sub: r.country, loc: r })); active = -1; hint = 'Недавние'; draw(hint); };
+  const pick = i => { const r = items[i]; if (!r) return; input.value = ''; close(); input.blur(); setLocation(r.loc); };
+  const search = debounce(async () => {
+    const q = input.value.trim(), my = ++seq;
+    if (q.length < 2) { close(); showRecent(); return; }
+    try {
+      const d = await fetchJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=7&language=ru&format=json`, { ttl: HOUR });
+      if (my !== seq) return;
+      items = (d.results || []).map(r => { const sub = [r.admin1, r.country].filter(Boolean).join(', '); return { name: r.name, sub, loc: { lat: r.latitude, lon: r.longitude, name: r.name, country: sub } }; });
+      active = -1; hint = ''; draw();
+    } catch (e) {
+      if (my !== seq) return;
+      items = []; open(`<li class="hint muted" role="presentation">Поиск недоступен: ${esc(e.message)}</li>`);
+    }
+  }, 300);
+  input.addEventListener('input', search);
+  input.addEventListener('focus', showRecent);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { close(); input.blur(); return; }
+    if (list.hidden || !items.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); active = (active + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; draw(hint); }
+    else if (e.key === 'Enter') { e.preventDefault(); pick(Math.max(active, 0)); }
+  });
+  list.addEventListener('mousedown', e => e.preventDefault());        // не терять фокус поля при клике
+  list.addEventListener('click', e => { const li = e.target.closest('li[data-i]'); if (li) pick(+li.dataset.i); });
+  input.addEventListener('blur', () => setTimeout(close, 120));
+}
+
+function applyTheme() {
+  const t = activeTheme();
+  document.documentElement.dataset.theme = t;
+  $('meta[name=theme-color]').content = cssVar('--bg');
+  $('#btn-night').setAttribute('aria-pressed', state.night);
+  globe.ok && (globe.readColors(), globe.draw());
+  if (window.Chart) { renderHourChart(); if (state.data.wind) renderWind(); if (state.data.xray) renderXray(); if (state.data.quakes) renderQuakes(); }      // перекрасить графики
+}
+function syncControls() {
+  $$('[data-unit]').forEach(b => b.setAttribute('aria-pressed', state.units[b.dataset.unit] === b.dataset.val));
+  $$('[data-period]').forEach(b => b.setAttribute('aria-pressed', state.quake.period === b.dataset.period));
+  $$('[data-theme-set]').forEach(b => b.setAttribute('aria-pressed', state.theme === b.dataset.themeSet));
+  $$('[data-layer]').forEach(b => b.setAttribute('aria-pressed', !!state.layers[b.dataset.layer]));
+  $$('[data-htab]').forEach(b => b.setAttribute('aria-pressed', b.dataset.htab === state.hourTab));
+  const m = state.quake.minMag, out = $('#q-mag-out');
+  $('#q-mag').value = m; out.textContent = m > 0 ? `M ${m.toFixed(1)}+` : 'все'; out.className = `badge lv${magLevel(m)}`;
+}
+/* Перерисовка всего из уже загруженных данных (смена единиц) — без сети */
+function renderAll() {
+  if (state.data.weather) { renderWeather(); renderClimate(); } else renderHero();
+  renderAurora(); renderQuakeStats(); renderQuakes(); renderHistory(); renderStatus();
+  if (globe.sel) globe.select(globe.sel);
+}
+
+/* --- Ссылка-снимок (место, единицы, фильтры) + короткая текстовая сводка --- */
+function shareState() {
+  const { loc, units, quake, data } = state;
+  const p = new URLSearchParams({ lat: loc.lat.toFixed(3), lon: loc.lon.toFixed(3), name: loc.name, t: units.temp, w: units.wind, d: units.dist, p: quake.period, m: quake.minMag });
+  const url = location.href.split('#')[0] + '#' + p, kp = kpSeries(), parts = [];
+  if (data.weather) parts.push(`${U.temp(data.weather.current.temperature_2m).replace('°', U.tempUnit())}, ${wmoText(data.weather.current.weather_code).toLowerCase()}`);
+  if (kp) parts.push(`Kp ${kp.cur.kp.toFixed(1)}`);
+  if (data.quakesDay) parts.push(`землетрясений за сутки: ${data.quakesDay.length}`);
+  const text = `${loc.name} — ${parts.join(' · ') || 'Земля сегодня'} (${$('#status-pill').textContent.toLowerCase()})`;
+  if (navigator.share && matchMedia('(pointer: coarse)').matches) { navigator.share({ title: 'Земля сегодня', text, url }).catch(() => {}); return; }
+  (navigator.clipboard?.writeText(`${text}\n${url}`) || Promise.reject())
+    .then(() => toast('Сводка и ссылка скопированы'))
+    .catch(() => { try { history.replaceState(null, '', '#' + p); } catch {} toast('Ссылка-снимок теперь в адресной строке — скопируйте её оттуда'); });
+}
+
+let lastRefresh = 0;
+async function refreshAll(force = false) {
+  lastRefresh = Date.now();
+  await Promise.allSettled([loadWeather(force), loadSpace(force), loadQuakes(force), loadHistory(false)]);
+  renderStatus();
+  $('#updated').textContent = `Обновлено в ${fTime.format(new Date())}, дальше — каждые 5 минут.`;
+}
+
+function bindUI() {
+  initSearch();
+  const pop = $('#settings'), setBtn = $('#btn-set');
+  const togglePop = open => { pop.hidden = !open; setBtn.setAttribute('aria-expanded', open); };
+  setBtn.addEventListener('click', e => { e.stopPropagation(); togglePop(pop.hidden); });
+  $('#btn-geo').addEventListener('click', () => geolocate(true));
+  $('#btn-refresh').addEventListener('click', () => refreshAll(true));
+  $('#btn-share').addEventListener('click', shareState);
+  const toggleNight = () => { state.night = !state.night; applyTheme(); renderAurora(); };
+  $('#btn-night').addEventListener('click', toggleNight);
+  // Делегирование: единицы, тема, слои, период, вкладки графика, сортировка, «повторить», переход к событию
+  document.addEventListener('click', e => {
+    if (!pop.hidden && !e.target.closest('#settings')) togglePop(false);
+    const b = e.target.closest('button'); if (!b) return;
+    const ds = b.dataset;
+    if (ds.unit) { state.units[ds.unit] = ds.val; save(); syncControls(); renderAll(); }
+    else if (ds.themeSet) { state.theme = ds.themeSet; state.night = false; save(); syncControls(); applyTheme(); }
+    else if (ds.layer) { state.layers[ds.layer] = !state.layers[ds.layer]; save(); syncControls(); globe.draw(); }
+    else if (ds.period) { state.quake.period = ds.period; save(); syncControls(); loadQuakes(); }
+    else if (ds.htab) { state.hourTab = ds.htab; save(); renderHourChart(); }
+    else if (ds.retry) ({ weather: loadWeather, space: loadSpace, quakes: loadQuakes, history: loadHistory })[ds.retry]?.(true);
+    else if (ds.quake) focusQuake(ds.quake);
+    else if (b.id === 'g-close') globe.select(null);
+    else if (b.parentElement.dataset.sort) { state.quake.sort = b.parentElement.dataset.sort; save(); renderQuakes(); }
+  });
+  let lastFeed = feedUrl(state.quake.period, state.quake.minMag);
+  const onMag = debounce(() => { save(); const f = feedUrl(state.quake.period, state.quake.minMag); f === lastFeed ? renderQuakes() : loadQuakes(); lastFeed = f; }, 180);
+  $('#q-mag').addEventListener('input', e => { state.quake.minMag = +e.target.value; syncControls(); onMag(); });
+  // Горячие клавиши (не срабатывают при вводе текста)
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') togglePop(false);
+    if (e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target === globe.cv) return;
+    const k = e.key.toLowerCase();
+    if (e.key === '/') { e.preventDefault(); $('#q').focus(); }
+    else if (k === 'r' || k === 'к') refreshAll(true);
+    else if (k === 'n' || k === 'т') toggleNight();
+    else if (k === 't' || k === 'е') { state.theme = activeTheme() === 'dark' ? 'light' : 'dark'; state.night = false; save(); syncControls(); applyTheme(); }
+  });
+  sysTheme.addEventListener('change', () => { if (state.theme === 'auto') applyTheme(); });
+  window.addEventListener('hashchange', () => { if (applyHash()) { syncControls(); setLocation(state.loc, false); loadQuakes(); } });
+  window.addEventListener('online', () => refreshAll(true));
+  // Автообновление раз в 5 минут, только когда вкладка видима
+  const tick = () => { if (!document.hidden && Date.now() - lastRefresh >= 5 * MIN) refreshAll(); };
+  setInterval(tick, 30e3); document.addEventListener('visibilitychange', tick);
+}
+
+function init() {
+  ls.prune(); restore();
+  const firstVisit = !state.loc;
+  if (firstVisit) state.loc = { ...DEFAULT_LOC };
+  if (window.Chart) { Chart.defaults.font.family = getComputedStyle(document.body).fontFamily; Chart.defaults.font.size = 12; }
+  syncControls(); bindUI(); globe.init(); applyTheme(); renderHero();
+  refreshAll();
+  if (firstVisit) geolocate(false);       // данные уже грузятся для города по умолчанию; при успехе переключимся
+}
+document.addEventListener('DOMContentLoaded', init);     // defer-скрипты CDN к этому моменту уже выполнены или не загрузились
+</script>
+</body>
+</html>
